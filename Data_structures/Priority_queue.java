@@ -26,74 +26,118 @@ public class Priority_queue<E> {
 
     // Construct an empty priority queue using natural ordering (min-priority).
     // Throws ClassCastException at insert time if E does not implement Comparable.
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public Priority_queue() {
-
+        this((Comparator<? super E>) (Comparator) Comparator.naturalOrder());
     }
 
     // Construct an empty priority queue ordered by the given Comparator.
     // For a max-priority queue, pass Comparator.reverseOrder().
     public Priority_queue(Comparator<? super E> cmp) {
-
+        this.cmp = cmp;
+        this.heap = new Heap<>();
     }
 
     // Construct a priority queue from the given values using O(n) heapify, natural ordering.
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public Priority_queue(E[] values) {
-
+        this(values, (Comparator<? super E>) (Comparator) Comparator.naturalOrder());
     }
 
     // Construct a priority queue from the given values using O(n) heapify, given Comparator.
+    @SuppressWarnings("unchecked")
     public Priority_queue(E[] values, Comparator<? super E> cmp) {
-
+        this.cmp = cmp;
+        Entry<E>[] wrapped = (Entry<E>[]) new Entry[values.length];
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] == null) throw new NullPointerException();
+            wrapped[i] = new Entry<>(values[i], cmp);
+        }
+        this.heap = new Heap<>(wrapped);
     }
 
     // Return the number of elements.
     public int size() {
-        return 0;
+        return this.heap.size();
     }
 
     // Return true if empty.
     public boolean isEmpty() {
-        return false;
+        return this.heap.isEmpty();
     }
 
     // Add value. O(log n). Throw NullPointerException if value is null.
     public void offer(E value) {
-
+        if(value == null){
+            throw new NullPointerException();
+        }
+        heap.add(new Entry<>(value, cmp));
     }
 
     // Return (without removing) the highest-priority element. O(1).
     // Throw NoSuchElementException if empty.
     public E peek() {
-        return null;
+        return this.heap.peek().value;
     }
 
     // Remove and return the highest-priority element. O(log n).
     // Throw NoSuchElementException if empty.
     public E poll() {
-        return null;
+        if(this.heap.isEmpty()){
+            throw new NoSuchElementException();
+        }
+        return this.heap.poll().value;
     }
 
     // Return true if value is present anywhere. O(n).
     public boolean contains(E value) {
+        if(value == null){
+            return false;
+        }
+        for(int index = 0; index < this.heap.size(); index ++){
+            if(Objects.equals(value, this.heap.get(index).value)){
+                    return true;
+            }
+        }
         return false;
     }
 
     // Remove the first occurrence of value. Return true if removed, false if not present.
-    // O(n) to find, O(log n) to restore order.
     public boolean remove(E value) {
+        if(value == null){
+            return false;
+        }
+        for(int index = 0; index < this.heap.size(); index ++){
+            if(Objects.equals(value, this.heap.get(index).value)){
+                this.heap.remove(this.heap.get(index));
+                return true;
+            }
+        }
         return false;
     }
 
     // Remove all elements.
     public void clear() {
-
+        this.heap.clear();
     }
 
-    // Return "[v0, v1, ..., v_{size-1}]" of the underlying heap's level-order layout
-    // (unwrapping Entry to value). Not sorted order.
+    // Return "[v0, v1, ..., v_{size-1}]" of the underlying heap's level-order layout.
     @Override
     public String toString() {
-        return "";
+        String output = "[";
+        for(int array_index = 0; array_index < this.heap.size(); array_index++){
+            if(this.heap.get(array_index).value == null){
+                output += "null";
+            }else{
+                output += this.heap.get(array_index).value.toString();
+            }
+            output += ", ";
+        }
+        if(this.heap.size() > 0){
+            output = output.substring(0, output.length()-2);
+        }
+        output += "]";
+        return output;
     }
 }
 

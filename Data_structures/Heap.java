@@ -191,6 +191,11 @@ public class Heap<E extends Comparable<E>> {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    public E get(int index){
+        return (E)this.arr[index];
+    }
+
     // Remove all elements. After this call, size is 0 and the heap is usable again.
     public void clear() {
         for(int index = 0; index < this.size; index++){
@@ -219,6 +224,8 @@ public class Heap<E extends Comparable<E>> {
         return output;
     }
 }
+
+
 
 
 
