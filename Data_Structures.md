@@ -13,10 +13,10 @@ Positives, negatives, and algorithm thought-process for each structure built fro
 8. [Priority_queue](#priority_queue)
 9. [Union_find](#union_find)
 10. [Union_find_compressed](#union_find_compressed)
-11. [Binary_search_tree](#binary_search_tree)
-12. [Hash_table](#Hash_table)
-13. [Fenwick_tree](#Fenwick_tree)
-14. [Suffix_array + LCP array](#Suffix_array)
+11. [Binary_search_tree](#binary_search_treee-extends-comparable)
+12. [Hash_table](#hash_tablek-v)
+13. [Fenwick_tree](#fenwick_tree-binary-indexed-tree)
+14. [Suffix_array + LCP array](#suffix_array--lcp-array)
 
 ---
 
