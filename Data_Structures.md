@@ -14,6 +14,9 @@ Positives, negatives, and algorithm thought-process for each structure built fro
 9. [Union_find](#union_find)
 10. [Union_find_compressed](#union_find_compressed)
 11. [Binary_search_tree](#binary_search_tree)
+12. [Hash_table](#Hash_table)
+13. [Fenwick_tree](#Fenwick_tree)
+14. [Suffix_array + LCP array](#Suffix_array)
 
 ---
 
@@ -327,9 +330,113 @@ The trick that makes remove clean: recursive helpers take a subtree and **return
 
 ---
 
-## Hash table
+## Hash_table<K, V>
 
-best for key-value store. or to track frequencies. given a H(x)=H(y) then x might be equal to y but if H(x)!= H(y) then x is not equal to y. keys are immutable.
+Key→value store backed by an array, with a hash function mapping keys to slots. Best for key-value storage and frequency counting. `H(x)==H(y)` is necessary but not sufficient — `x` *might* equal `y` (collision). But `H(x)!=H(y)` guarantees `x != y`. So after hashing to a slot you must still confirm with `equals`. Keys must be immutable — a key whose hashCode changes after insertion is lost.
+
+### Positives
+- Average O(1) put / get / remove / containsKey.
+- Any immutable, hashable key; ideal for frequency counts, dedup, memoization, set membership.
+
+### Negatives
+- Worst case O(n) — a degenerate hash or adversarial keys collapse everything into one chain/probe run.
+- No ordering: no sorted iteration, no range/min/max queries (that's a tree's job).
+- Resize is O(n) — a periodic latency spike.
+- Wasted space: load factor < 1 leaves empty slots (open addressing) or adds pointer overhead (chaining).
+- Keys must have a stable hashCode — mutating a key after insertion loses it.
+
+### Algorithm / thought process
+A hash function maps a key to a slot index. Because distinct keys can hash to the same slot, every lookup hashes to the slot **then verifies with `equals`** before claiming a match.
+
+**Collisions — two strategies:**
+
+1. **Separate chaining** — each slot holds a container (linked list, array, or balancing tree). Colliding keys live in that container; lookup hashes to the slot, then scans the container with `equals`.
+2. **Open addressing** — entries sit directly in the array; on collision, probe for the next open slot via a probing sequence. Lookup follows the same probe sequence, comparing with `equals`, until it finds the key or hits an empty slot.
+
+**Probing & cycles (open addressing):** a bad probe sequence can cycle and never visit every slot. Avoid this by keeping the probe step and table size **coprime** (GCD 1). Linear probing `P(x)=x` trivially satisfies this; alternatively keep the table size **prime**. When you grow the table, the GCD-1 property must still hold.
+
+**Double hashing:** `position = (H1(k) + x·α) mod size`, where `α = H2(k) mod size`. If `α == 0`, force `α = 1` — a zero step would never advance. Using a second hash for the step spreads probes better than linear probing and breaks up primary clustering.
+
+**Deletion (open addressing):** you can't just empty a slot — that severs the probe chain, so a later search stops too early and wrongly reports "not found." Instead mark a **tombstone**. Search skips tombstones and keeps probing; insert may reuse them. A tombstone clears only on resize or when a new pair takes that slot.
+
+**Search optimization:** while probing, hold a pointer to the first tombstone seen. When the key turns up further along, copy it back into that tombstone slot and clear the original — shortening future probes for that key.
+
+**Resize / rehash:** as occupancy climbs, chains and probe runs lengthen and the O(1) guarantee degrades. Past a load-factor threshold, allocate a larger table and rehash every entry — indices depend on capacity, so they all move. Resizing also purges tombstones.
+
+
+---
+
+## Fenwick_tree (Binary Indexed Tree)
+
+Array structure for prefix/range sums over a mutable array. Given values `A`, compute the sum between `i` and `j` and update single elements, both in O(log n). A plain prefix-sum array gives O(1) queries but O(n) updates; a Fenwick tree balances both at O(log n). Fixed size — you can't add or remove indices after construction.
+
+Each cell is responsible for a block of elements determined by its **least significant bit**, `LSB(i) = i & (-i)`. Cell `i` covers `LSB(i)` elements, the range `(i - LSB(i), i]`:
+- `12 = 1100`, LSB = 4 → responsible for 4 cells (indices 9–12).
+- `10 = 1010`, LSB = 2 → responsible for 2 cells (9–10).
+- `11 = 1011`, LSB = 1 → responsible for itself only (11).
+
+See ![Alt text](./Images/Fenwick.png) for the 0–7 range walk.
+
+### Positives
+- Prefix sum, range sum, and point update all O(log n); construction O(n).
+- Tiny and simple: a single array, no nodes or pointers — much lower constant factor than a segment tree for sum-type queries.
+
+### Negatives
+- Fixed size — indices can't be added or removed after construction.
+- Range query works by subtracting prefixes, so it needs an **invertible** operation (sum, XOR). It can't do range min/max — that's segment-tree territory.
+- Less flexible than a segment tree overall (no arbitrary range operations; basic form has no lazy propagation).
+- 1-indexed internally; index 0 is unusable, an easy off-by-one trap.
+
+### Algorithm / thought process
+Core primitive: `LSB(i) = i & (-i)` — isolates the lowest set bit. Everything below is bit walking.
+
+**Prefix sum `prefix(i)`** — walk *down*. `sum = 0; while i > 0: sum += tree[i]; i -= LSB(i)`. Stripping the lowest set bit jumps to the cell covering the block just before this one, so you accumulate a logarithmic number of disjoint blocks — one step per set bit, O(log n).
+
+**Range sum `range(l, r) = prefix(r) - prefix(l-1)`** — this subtraction is exactly why the operation must be invertible.
+
+**Point update `update(i, delta)`** — walk *up*. `while i <= n: tree[i] += delta; i += LSB(i)`. Adding the LSB moves to the next cell whose responsibility range contains `i`, fixing every cell that includes this index. Also O(log n).
+
+**O(n) construction** — load the raw values into `tree`, then for each `i` push its accumulated value into its parent at `i + LSB(i)` (if `parent <= n`). One pass; each cell contributes to exactly one parent, so the whole tree is built in linear time instead of n separate O(log n) updates.
+
+**1-indexing** — the tree must be 1-based. `LSB(0) = 0`, so an index of 0 never moves and the prefix loop would spin or stall. Map an external 0-based index `k` to internal `k + 1`.
+
+**Variants** (basic form is point-update + prefix-query):
+- range-update + point-query → store deltas using the difference-array trick on one BIT.
+- range-update + range-query → maintain two BITs.
+
+---
+
+## Suffix_array (+ LCP array)
+
+A **suffix** is a non-empty trailing part of a string; an n-character string has n suffixes. The **suffix array** is those suffixes sorted lexicographically, stored as their start indices — you keep only the n indices, not the suffixes themselves, since the string reconstructs any suffix on demand. It's the compact, array-based alternative to a suffix tree (a compressed trie of suffixes).
+
+The **LCP array** rides alongside it: `lcp[i]` is how many leading characters the two adjacent sorted suffixes at ranks `i` and `i-1` share. `lcp[0] = 0`. Together, the suffix array and LCP array turn many string problems that are quadratic naively into O(n) or O(n log n) ones.
+
+### Positives
+- Compact: n integers (plus the string), far less memory than a suffix tree's node structure; flat arrays are cache-friendly.
+- Unlocks fast substring work — distinct-substring counts, longest repeated substring, longest common substring across many strings, and pattern search by binary-searching the sorted suffixes in O(m log n).
+- The LCP array is the workhorse: most of the interesting results are simple arithmetic over it.
+
+### Negatives
+- Construction is the hard part: the naive "sort all suffixes" is O(n² log n); efficient builds (prefix doubling O(n log n)/O(n log² n), or linear-time SA-IS / DC3) are more involved to implement than a suffix tree's incremental build.
+- Static: built for one fixed string. Inserting or deleting characters means rebuilding.
+- Some queries a suffix tree answers directly need the LCP array plus extra machinery (e.g. range-minimum queries) on top of the suffix array.
+
+### Algorithm / thought process
+**Build (suffix array):** the naive route lists all suffixes and sorts them with a string comparator — correct but O(n² log n) because each comparison can scan O(n) characters. The standard speedup is **prefix doubling**: sort suffixes by their first 1, then 2, 4, …, 2^k characters, reusing the previous round's ranks as the sort key, reaching O(n log n) or O(n log² n). Linear-time algorithms (SA-IS, DC3) exist but are intricate.
+
+**Build (LCP), Kasai's algorithm:** with the suffix array and its inverse (the rank of each suffix), walk the suffixes in *original string order*. The key insight that makes it O(n): when you move from one suffix to the next, the LCP you can carry over drops by at most one character, so the running comparison length never resets to zero — total work is linear.
+
+**Using it:**
+- **Distinct substrings** — every substring is a prefix of exactly one suffix. There are `n(n+1)/2` prefixes in total, but adjacent sorted suffixes share `lcp[i]` leading characters that get counted twice, so `distinct = n(n+1)/2 - sum(lcp)`.
+- **Longest repeated substring** — a repeat is a common prefix of two distinct suffixes, so the answer's length is `max(lcp)`, and the substring is that many characters of the suffix at that rank.
+- **Pattern search** — binary-search the sorted suffixes for the pattern in O(m log n).
+
+---
+
+## Data Structure name
+
+Description
 
 ### Positives
 - 
@@ -338,6 +445,8 @@ best for key-value store. or to track frequencies. given a H(x)=H(y) then x migh
 - 
 
 ### Algorithm / thought process
+
+
 
 
 ---
