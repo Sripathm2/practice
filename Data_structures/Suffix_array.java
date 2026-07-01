@@ -73,6 +73,8 @@ public class Suffix_array {
         return this.lcp;
     }
 
+    
+
     // Return the suffix beginning at sorted rank r (0-based). For tests/debugging.
     // Throw IndexOutOfBoundsException if rank not in [0, n).
     public String suffixAt(int rank) {
