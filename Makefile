@@ -14,7 +14,7 @@ DS_DIR  := Data_structures
 ALG_DIR := Algorithms
 SRCS    := $(wildcard $(DS_DIR)/*.java) $(wildcard $(ALG_DIR)/*.java)
 
-.PHONY: run run-all clean
+.PHONY: run run-all clean run-latest
 
 # Build everything, run <F>_Main from whichever package contains <F>.java, then clean.
 run:
@@ -56,6 +56,12 @@ clean:
 	rm -f test-results.log
 
 # List available Main classes
-list:
-	@ls $(DS_DIR)/*.java | sed 's|$(DS_DIR)/||;s|\.java||' | awk '{print "  make run F="$$1}'
-	@ls $(ALG_DIR)/*.java | sed 's|$(ALG_DIR)/||;s|\.java||' | awk '{print "  make run F="$$1}'
+list-all:
+	@ls -t $(DS_DIR)/*.java $(ALG_DIR)/*.java | sed 's|.*/||;s|\.java||' | awk '{print "  make run F="$$1}'
+
+
+run-latest:
+	@latest=$$(ls -t $(DS_DIR)/*.java $(ALG_DIR)/*.java | head -1); \
+	F=$$(basename $$latest .java); \
+	echo "running latest: $$F"; \
+	$(MAKE) run F=$$F

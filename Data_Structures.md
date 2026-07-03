@@ -20,6 +20,7 @@ Positives, negatives, and algorithm thought-process for each structure built fro
 15. [Balanced binary search trees](#balanced-binary-search-trees)
 16. [AVL tree](#avl-tree)
 17. [Indexed priority queue](#indexed_priority_queue)
+18. [Sparse table](#sparse_table)
 
 ---
 
@@ -555,33 +556,18 @@ Fill row 0 by copying the array, then two nested loops (over rows `i`, then colu
 
 **The log array.** To find the exponent for a length quickly, precompute `log[1] = 0`, `log[i] = log[i/2] + 1`, for `i` up to N. Then `log[len]` gives `floor(log2(len))` in O(1) — no `Math.log` per query.
 
-**Getting `k` (the block size for a query).** For a range `[l, r]` inclusive, the length is `len = r - l + 1`. You want the largest power of two that fits inside it: `p = log[len]` (that's `floor(log2(len))` from the precomputed log array), and `k = 1 << p` = `2^p`. Because `p` is the floor, `k` is at most `len` but strictly more than `len/2` — so `k` is more than half the range. That "more than half" is the whole reason two `k`-blocks can cover the range: one anchored at each end, they meet in the middle (and overlap). Example: `[2, 6]` has `len = 5`, `p = log[5] = 2`, `k = 4`. Two length-4 blocks: `[2,5]` and `[3,6]` — together they cover `[2,6]`, overlapping on `[3,5]`.
-
-**Query type 1 — overlap-friendly (idempotent `F`), O(1).** When `F(x,x) == x` (min, max, gcd), overlap is harmless, so you cover `[l, r]` with just two blocks of size `k`: one starting at `l`, one *ending* at `r` (which starts at `r - k + 1`):
+**Query `[l, r]` (inclusive).** Let `len = r - l + 1`, `p = log[len]`, and `k = 2^p` (the largest power of two that fits in the range). Cover `[l, r]` with two length-`k` blocks: one starting at `l` (`table[p][l]`) and one *ending* at `r`, which starts at `r - k + 1` (`table[p][r - k + 1]`). For an idempotent `F` these two blocks may overlap in the middle and it doesn't matter:
 
 ```
-p = log[r - l + 1]
-k = 1 << p
 answer = F(table[p][l], table[p][r - k + 1])
 ```
 
-Two lookups, one `F`, constant time regardless of range length. The middle elements get counted twice, but idempotency means double-counting doesn't change the answer.
 
-**Query type 2 — associative-only `F` (not idempotent), O(log n).** For `sum`, `product`, `xor`, double-counting *does* corrupt the result, so the blocks must be **disjoint**. Walk the range greedily from the largest power of two down: whenever a block of size `2^p` fits inside what's left of `[l, r]`, take `table[p][l]`, fold it into the running answer, and advance `l` past it:
+That's the whole query — two lookups and one `F`, O(1). For a non-idempotent `F`, decompose `[l, r]` into disjoint power-of-two blocks instead, combining O(log n) of them.
 
-```
-result = <unset>
-for p from log[n] down to 0:
-    if l + (1 << p) - 1 <= r:          // a 2^p block fits starting at l
-        block = table[p][l]
-        result = (result unset) ? block : F(result, block)
-        l += (1 << p)
-return result
-```
-
-The range length in binary tells you exactly which blocks you take — one per set bit of `len` — so at most `log n` blocks, hence O(log n). No identity element is needed: seed `result` with the first block taken. (This method also works for idempotent `F`; it's just slower than the two-block trick.)
 
 **The `<<` operator.** `<<` is a left bit-shift: `x << p` shifts `x`'s bits left by `p`, which multiplies it by `2^p`. So `1 << p` is the idiomatic way to write `2^p` (all the block sizes here are powers of two), and `r - (1 << p) + 1` is just `r - k + 1`, the start index of the right-aligned block. It's used heavily because it's faster and clearer than `Math.pow` for powers of two, and it never introduces floating-point error.
+
 ---
 
 ## Name
@@ -595,6 +581,7 @@ Description
 - 
 
 ### Algorithm / thought process
+
 ---
 
 ## Name
