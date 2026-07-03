@@ -17,6 +17,9 @@ Positives, negatives, and algorithm thought-process for each structure built fro
 12. [Hash_table](#hash_tablek-v)
 13. [Fenwick_tree](#fenwick_tree-binary-indexed-tree)
 14. [Suffix_array + LCP array](#suffix_array--lcp-array)
+15. [Balanced binary search trees](#balanced-binary-search-trees)
+16. [AVL tree](#avl-tree)
+17. [Indexed priority queue](#indexed_priority_queue)
 
 ---
 
@@ -434,7 +437,154 @@ The **LCP array** rides alongside it: `lcp[i]` is how many leading characters th
 
 ---
 
-## Data Structure name
+## Balanced binary search trees
+
+Self-adjusting BSTs that keep the height at O(log n) so every operation stays O(log n). A plain BST can degrade into a long chain (sorted-order inserts), collapsing to O(n). A balanced tree carries a **tree invariant** — a structural rule — and whenever an operation violates it, one or more **rotations** restore it. Different balanced trees differ only in their invariant and when they rotate (AVL: strict height balance; red-black: color rules).
+
+### Positives
+- Guaranteed O(log n) search/insert/delete regardless of insertion order — no degeneration to a chain.
+- Keeps everything a plain BST offers: in-order traversal is sorted, plus min/max/successor/predecessor and range queries.
+
+### Negatives
+- Rotations and the maintenance they require add constant-factor overhead and real implementation complexity over a plain BST.
+- Extra per-node metadata (height, or color/balance) and an update pass on the way back up every operation.
+- Pointer-chasing structure; not as cache-friendly as a flat array.
+
+### Algorithm / thought process
+A **rotation** is a local, O(1) restructuring that changes a subtree's height while preserving BST ordering. Take two nodes where `B` is a child of `A`:
+
+- **Right rotation** (lift the left child): `B = A.left; A.left = B.right; B.right = A; return B`.
+- **Left rotation** is the mirror: lift the right child.
+
+Returning the new subtree root (`B`) is the return-and-reassign pattern — the caller rewires its own child pointer to the returned node, so no parent-pointer bookkeeping is needed (same trick as recursive BST remove). Ordering is preserved because a right rotation only moves `B.right` (all keys between `B` and `A`) from `B`'s right to `A`'s left, which is exactly where they belong.
+
+---
+
+## AVL tree
+
+A balanced BST with a strict per-node balance rule. Each node tracks a **balance factor** `BF = Height(right) − Height(left)`, which must stay in `{−1, 0, 1}`. Height is the number of edges from the node to its furthest leaf (null subtree = −1, leaf = 0). Any insert or delete that pushes a `BF` to ±2 triggers a rebalancing rotation.
+
+### Positives
+- Strictly balanced, so it has the tightest height bound of the common balanced trees (height ≤ ~1.44 log n) — the fastest lookups of the balanced family.
+- Deterministic O(log n) worst case for search, insert, and delete.
+
+### Negatives
+- Rebalances aggressively to stay strictly balanced, so it does more rotations per insert/delete than a red-black tree — write-heavy workloads pay for it.
+- Height/BF metadata on every node, plus an `update` + `balance` pass on every node along the path back up.
+
+### Algorithm / thought process
+**Height and BF:** null height = −1, leaf height = 0. `update(node)` sets `node.height = 1 + max(height(left), height(right))` and recomputes `BF`. Call it on a node before you balance it.
+
+**The four cases** (using `BF = right − left`), decided by the node's BF and the offending child's BF:
+- `BF = −2`, left child `BF ≤ 0` → **left-left** → single **right** rotation on the node.
+- `BF = −2`, left child `BF > 0` → **left-right** → **left** rotate the left child, then **right** rotate the node.
+- `BF = +2`, right child `BF ≥ 0` → **right-right** → single **left** rotation on the node.
+- `BF = +2`, right child `BF < 0` → **right-left** → **right** rotate the right child, then **left** rotate the node.
+
+Read the child's BF to tell the "straight" case from the "bent" one. The `≤ 0` / `≥ 0` (rather than strict `<` / `>`) matters for **deletion**: there the offending child can have `BF = 0`, and treating that as the straight case (single rotation) keeps the tree valid. During insertion the child is never balanced in a violating case, so the boundary is only exercised by deletes.
+
+**Insert:** reject duplicates first, then recurse left/right and place the new node at a leaf. On the way back up, call `update` then `balance` at each node. Each rotation is O(1); after rotating, re-`update` the moved nodes — the lower node first, then the new subtree root — so their heights are correct before the next level up looks at them.
+
+**Delete:** identical to BST deletion (leaf / one-child / two-child-successor-swap), then `update` + `balance` on every node along the path back up — the exact same rebalancing machinery as insert. A single delete can cascade rotations up multiple levels, unlike insert which needs at most one rebalance.
+
+---
+
+## Indexed_priority_queue
+
+A priority queue that also supports fast **update** and **delete** of an arbitrary key's priority — the operations a plain binary heap can't do without an O(n) scan. The trick is a bidirectional mapping: every key gets a stable **key index** `ki` in `[0, N)`, and two inverse maps translate between "which key" and "where it sits in the heap." Priorities are stored keyed by `ki` and never move; only heap *positions* move during swim/sink.
+
+### Positives
+- O(log n) insert, delete, poll, and change-priority (update/decrease-key/increase-key); O(1) `contains`, `valueOf`, and peek-min.
+- Can reprioritize or remove an existing item in O(log n) — exactly what Dijkstra, Prim, and schedulers need (decrease-key on a known node).
+
+### Negatives
+- Keys must come from a fixed index domain `[0, N)`; arbitrary keys need an extra hash map `key → ki` layer (and a fixed capacity N).
+- Three parallel arrays to keep in sync (`values`, `pm`, `im`) — more memory and bookkeeping than a plain heap, and easy to desync if a swap doesn't update every map.
+
+### Algorithm / thought process
+**The three arrays.** For a min-heap:
+- `values[ki]` — the priority of key `ki`. Keyed by `ki`, so it **never moves**.
+- `pm[ki]` (position map) — the heap position where key `ki` currently sits.
+- `im[pos]` (inverse map) — the key index living at heap position `pos`. The heap itself is really `im`: a heap of key indices, ordered by their `values`.
+- Invariant: `pm[im[pos]] == pos` and `im[pm[ki]] == ki`. `pm` and `im` are inverses.
+
+**swap(i, j)** — the reason values don't move. Because the priority lives in `values[ki]` (unmoving), a heap swap only exchanges *positions*: swap `im[i]` with `im[j]`, then fix `pm` for both keys so the maps stay inverse. A temp is needed to exchange the `im` entries. `values` is untouched.
+
+**swim(i)** (move up) — while node `i`'s priority (`values[im[i]]`) is smaller than its parent's at `(i-1)/2`, `swap(i, parent)` and move up to the parent. Used after an insert or when a key's priority decreases.
+
+**sink(i)** (move down) — pick the smaller-valued of the two children (`2i+1`, `2i+2`); while a child is smaller, `swap` with it and descend. Used after a delete or when a priority increases.
+
+**insert(ki, value)** — set `values[ki] = value`; place `ki` at the end position `sz` (`im[sz] = ki`, `pm[ki] = sz`); increment `sz`; then `swim(sz-1)` to float it to its spot.
+
+**update(ki, value)** — set `values[ki] = value`; let `i = pm[ki]`; then call **both** `sink(i)` and `swim(i)`. Only one will actually move it, but the new priority could violate the heap in either direction, so you attempt both.
+
+**delete(ki)** — let `i = pm[ki]`. Swap the target with the last element: `swap(i, sz-1)`. Shrink the heap: `sz--`. The element now sitting at position `i` is a stranger that could go either way, so restore the heap with `sink(i)` then `swim(i)`. Finally clear the removed key's slots: `values[ki] = null`, `pm[ki] = -1`, `im[sz] = -1`. (Deleting the min is just `delete(im[0])`.)
+
+**contains(ki)** — `pm[ki] != -1`. **valueOf(ki)** — `values[ki]`. **peek-min** — the key at the root, `im[0]`.
+
+---
+
+## Sparse_table
+
+Efficient range queries on a **static** array (data never changes). The idea: break every possible range into blocks whose lengths are powers of two, precompute the answer for all such blocks, and combine a few of them to answer any query. Precompute the answer for every interval of length 2^x, then reuse them.
+
+Two properties of the combining function `F` matter:
+- **Associative** — `F(F(A,B),C) == F(A,F(B,C))`. Required for a sparse table at all. (Note: `F(A,B) == F(B,A)` is *commutativity*, a different property; what you need here is associativity.)
+- **Idempotent / overlap-friendly** — `F(x,x) == x`, so combining two ranges that *overlap* doesn't double-count. This is the extra property that gives **O(1)** queries. `min`, `max`, `gcd`, bitwise and/or have it. `sum`, `product`, `xor` are associative but **not** idempotent — with those, overlapping blocks would double-count, so queries drop to O(log n) over disjoint blocks (and for plain sum a prefix-sum array is simpler anyway).
+
+### Positives
+- O(1) range queries for idempotent ops (min/max/gcd) after an O(n log n) build.
+- Simple, flat, cache-friendly table; no pointers, no rebalancing.
+
+### Negatives
+- **Static only.** Any element update invalidates the table; there is no cheap point update — you rebuild in O(n log n). If you need updates, use a segment tree.
+- O(1) queries need idempotency; sum/product-type ops get O(log n) queries or should use prefix sums.
+- O(n log n) memory — heavier than a prefix-sum array (O(n)) for the ops a prefix sum can already handle.
+
+### Algorithm / thought process
+**The table.** Let `P = floor(log2(N))`. Build a table of `P+1` rows and `N` columns where `table[i][j]` = `F` over the block `[j, j + 2^i)` — the length-`2^i` block starting at `j`. Blocks that would run off the end are left empty/unused.
+
+**Construction by doubling.** A block of length `2^i` is two halves of length `2^(i-1)`: `[j, j + 2^(i-1))` and `[j + 2^(i-1), j + 2^i)`. Those are exactly `table[i-1][j]` and `table[i-1][j + 2^(i-1)]`, so:
+
+```
+table[0][j] = arr[j]                                  // row 0 is the array itself
+table[i][j] = F(table[i-1][j], table[i-1][j + 2^(i-1)])
+```
+
+Fill row 0 by copying the array, then two nested loops (over rows `i`, then columns `j`) fill the rest, each cell in O(1) from the row below. Total O(n log n).
+
+**The log array.** To find the exponent for a length quickly, precompute `log[1] = 0`, `log[i] = log[i/2] + 1`, for `i` up to N. Then `log[len]` gives `floor(log2(len))` in O(1) — no `Math.log` per query.
+
+**Getting `k` (the block size for a query).** For a range `[l, r]` inclusive, the length is `len = r - l + 1`. You want the largest power of two that fits inside it: `p = log[len]` (that's `floor(log2(len))` from the precomputed log array), and `k = 1 << p` = `2^p`. Because `p` is the floor, `k` is at most `len` but strictly more than `len/2` — so `k` is more than half the range. That "more than half" is the whole reason two `k`-blocks can cover the range: one anchored at each end, they meet in the middle (and overlap). Example: `[2, 6]` has `len = 5`, `p = log[5] = 2`, `k = 4`. Two length-4 blocks: `[2,5]` and `[3,6]` — together they cover `[2,6]`, overlapping on `[3,5]`.
+
+**Query type 1 — overlap-friendly (idempotent `F`), O(1).** When `F(x,x) == x` (min, max, gcd), overlap is harmless, so you cover `[l, r]` with just two blocks of size `k`: one starting at `l`, one *ending* at `r` (which starts at `r - k + 1`):
+
+```
+p = log[r - l + 1]
+k = 1 << p
+answer = F(table[p][l], table[p][r - k + 1])
+```
+
+Two lookups, one `F`, constant time regardless of range length. The middle elements get counted twice, but idempotency means double-counting doesn't change the answer.
+
+**Query type 2 — associative-only `F` (not idempotent), O(log n).** For `sum`, `product`, `xor`, double-counting *does* corrupt the result, so the blocks must be **disjoint**. Walk the range greedily from the largest power of two down: whenever a block of size `2^p` fits inside what's left of `[l, r]`, take `table[p][l]`, fold it into the running answer, and advance `l` past it:
+
+```
+result = <unset>
+for p from log[n] down to 0:
+    if l + (1 << p) - 1 <= r:          // a 2^p block fits starting at l
+        block = table[p][l]
+        result = (result unset) ? block : F(result, block)
+        l += (1 << p)
+return result
+```
+
+The range length in binary tells you exactly which blocks you take — one per set bit of `len` — so at most `log n` blocks, hence O(log n). No identity element is needed: seed `result` with the first block taken. (This method also works for idempotent `F`; it's just slower than the two-block trick.)
+
+**The `<<` operator.** `<<` is a left bit-shift: `x << p` shifts `x`'s bits left by `p`, which multiplies it by `2^p`. So `1 << p` is the idiomatic way to write `2^p` (all the block sizes here are powers of two), and `r - (1 << p) + 1` is just `r - k + 1`, the start index of the right-aligned block. It's used heavily because it's faster and clearer than `Math.pow` for powers of two, and it never introduces floating-point error.
+---
+
+## Name
 
 Description
 
@@ -445,13 +595,9 @@ Description
 - 
 
 ### Algorithm / thought process
-
-
-
-
 ---
 
-## Data Structure name
+## Name
 
 Description
 
