@@ -204,3 +204,228 @@ The recursion tree has `log n` levels, and each level does O(n) total merging wo
 - **Generic version.** Swap `int[]` for `T[]` with `T extends Comparable<T>` (or a `Comparator`) and compare via `compareTo` instead of `<` — the structure is identical.
 
 ---
+
+## Dynamic programming
+
+A technique for problems that break into **overlapping** subproblems: solve each distinct subproblem once, store its answer, and reuse it instead of recomputing. It applies when a problem has *optimal substructure* (the answer is built from answers to smaller instances) and *overlapping subproblems* (the same smaller instances recur many times). That overlap is what separates DP from divide-and-conquer — D&C subproblems are independent, so caching buys nothing; DP subproblems repeat, so caching is the whole point.
+
+### Idea
+Four things to pin down:
+- **State** — the parameters that uniquely identify a subproblem (e.g. "index `i`, remaining capacity `w`").
+- **Transition / recurrence** — how a state's answer is built from smaller states.
+- **Base cases** — the smallest states, answered directly.
+- **Evaluation order** — either **top-down** (write the natural recursion, add a memo table so each state computes once) or **bottom-up** (tabulation: fill a table in dependency order so every state's inputs are ready before it).
+
+### Complexity
+Roughly (number of distinct states) × (work per transition). Memory is the table size, but it can often shrink: if a state only depends on the previous row/day, keep just that (a **rolling array**) and drop the full table.
+
+### Applications
+Fibonacci, 0/1 knapsack, longest common subsequence, edit distance, coin change, matrix-chain multiplication, and DP-flavored graph algorithms (Bellman-Ford, Floyd-Warshall).
+
+---
+
+## Magical_cows
+
+**Problem.** Farms hold cows, up to a capacity `C`. Every night a farm with `v` cows doubles to `2v`; if `2v <= C` it becomes one farm of `2v`, otherwise it splits into two farms of `v` cows each. Given the initial farms and a list of query days, report the total number of farms after each queried number of nights.
+
+### Idea
+Simulating individual farms explodes — farms can double every night, so after `D` nights you may have up to `N·2^D` of them. The unlock: **individual farms don't matter, only how many cows each holds**, and cow counts only ever range over `1..C`. So track a vector `cnt[v]` = number of farms currently holding `v` cows, and advance the whole vector one night at a time:
+
+- for each `v` with `2v <= C`: those farms grow — `next[2v] += cnt[v]` (one farm each, now at `2v`).
+- for each `v` with `2v > C`: those farms split — `next[v] += 2 * cnt[v]` (two farms each, still at `v`).
+
+That's an O(C) step regardless of how many farms exist. Precompute the vector day by day up to the largest query day, recording the **total farm count** (the sum of `cnt`) after each day; then every query is a table lookup. The DP is over the *distribution of cow counts across days*, and the payoff is precomputing once to answer all queries, instead of re-simulating per query.
+
+### Complexity
+O(C · D_max) to precompute (D_max = largest query day), then O(1) per query once daily totals are stored. Space is O(C) with a rolling pair of vectors, plus O(D_max) for the recorded totals. Farm totals grow up to ~`N·2^D`; use `long` (fits comfortably for the usual constraints `D ≤ 50`, `N, C ≤ 1000` — about `10^18` < `long` max).
+
+### Notes
+- The two transition cases are the crux: `2v <= C` → one farm at `2v`; `2v > C` → **two** farms at `v` (the split doubles that bucket's count).
+- Day 0 is just the initial farm count — make sure the loop handles a query of 0 nights.
+- Record the running total after each night as you go; don't re-run the simulation for each query.
+- Overflow is the lurking bug — sum into `long`, not `int`.
+
+
+--- 
+
+## Tiling
+
+**Problem.** Count the number of ways to completely fill a 1×n strip of slots using tiles of length 1 and length 2.
+
+### Idea
+Look at how the **last slot** gets covered — there are exactly two disjoint, exhaustive possibilities:
+- a size-1 tile sits in the last slot, leaving `n - 1` slots to fill → `ways(n - 1)` ways, or
+- a size-2 tile covers the last two slots, leaving `n - 2` slots → `ways(n - 2)` ways.
+
+Since those cases don't overlap and cover everything, `ways(n) = ways(n - 1) + ways(n - 2)`. Base cases: `ways(0) = 1` (the empty strip has exactly one tiling — place nothing) and `ways(1) = 1`. That's the Fibonacci recurrence; in fact `ways(n) = Fib(n + 1)`.
+
+The subproblems overlap heavily — plain recursion recomputes `ways(n-2)`, `ways(n-3)`, … an exponential number of times. Memoize (top-down) or tabulate (bottom-up) to make it O(n). And since each value depends only on the previous two, you don't need a table at all — two rolling variables suffice.
+
+### Complexity
+O(n) time. O(1) space with two rolling variables (or O(n) if you keep the full table). Values grow like Fibonacci (≈ φⁿ), so they overflow `long` at around n = 91 — use `BigInteger` beyond that.
+
+### Notes
+- **`ways(0) = 1` is the load-bearing base case.** An empty strip has one tiling (do nothing); setting it to 0 makes every larger answer wrong. This is the same subtlety as the empty-product / empty-sum convention.
+- **It's Fibonacci in disguise.** Recognizing that lets you reach for fast-doubling or matrix exponentiation to get O(log n) if the input is huge.
+- **No array needed.** Keep only the last two results and roll them forward; the full DP table is wasted memory here.
+- **Generalizes.** Tiles of sizes `{1, 2, ..., k}` give `ways(n) = ways(n-1) + ... + ways(n-k)`; a single tile size `m` restricts the recurrence to `ways(n-1) + ways(n-m)`. Same last-slot reasoning, more branches.
+
+
+---
+
+## Tiling_general
+
+**Problem.** Count the ways to fill a 1×n strip using tiles of various lengths, where a given length may come in several colors. Tiles are given as two parallel arrays: `lengths[i]` is an available length and `colors[i]` is how many distinct colors that length comes in. A tiling is a left-to-right sequence of colored tiles that exactly fills n.
+
+### Idea
+Same last-piece reasoning as basic tiling, generalized. Look at the **last tile** placed. It has some length `L` and some color, and it covers the final `L` slots, leaving `n - L` slots before it. Summing over every way to choose that last tile:
+
+```
+ways(0) = 1
+ways(m) = sum over i of  colors[i] * ways(m - lengths[i])   for lengths[i] <= m
+```
+
+Two dimensions of choice fall out naturally:
+- **Different lengths** → separate terms in the sum, each reaching back a different distance (`m - lengths[i]`).
+- **Different colors of the same length** → the `colors[i]` multiplier: each of the `colors[i]` colors is a distinct way to place that tile, so the subproblem's count is multiplied by it.
+
+The basic 1-and-2 tiling is just the special case `lengths = {1, 2}`, `colors = {1, 1}`, which collapses to Fibonacci. A single length with `k` colors gives `k^n`. Three unit-color lengths `{1,2,3}` gives the Tribonacci numbers.
+
+### Complexity
+O(n · t) time, where `t` is the number of tile types — for each of the n subproblems you sum over all types. O(n) space for the DP table (or O(maxLength) with a rolling window, since `ways(m)` only reaches back `maxLength` slots).
+
+### Notes
+- **`ways(0) = 1`** is still the anchor — one way to tile nothing.
+- **The color count is a multiplier, not a new term.** Adding a color of an existing length doesn't add a term to the sum; it scales that length's existing term. Two colors of length 1 turn `+ ways(m-1)` into `+ 2·ways(m-1)`.
+- **Watch overflow.** With many colors the count grows fast (up to `k^n` for k colors of length 1); sum into `long`, and reach for `BigInteger` if the numbers can exceed it.
+- **Skip out-of-range tiles.** Only include the term when `lengths[i] <= m`; a tile longer than the remaining strip can't be the last piece.
+- Representing colors as counts (rather than listing each colored tile separately) keeps the sum compact — otherwise you'd duplicate the same length term `colors[i]` times, which is arithmetically identical but wasteful.
+
+---
+
+## Domino_tiling_3xn
+
+**Problem.** Count the ways to completely tile a 3×n board with 1×2 dominoes (each domino covers two adjacent cells, laid horizontally or vertically).
+
+### Idea
+Two observations set it up:
+
+- **Parity.** A 3×n board has `3n` cells and each domino covers 2, so a full tiling needs `3n` to be even — i.e. **n even**. Every odd n gives 0. (This is why the answer sequence is `1, 0, 3, 0, 11, 0, 41, …` — zeros on the odds.)
+
+- **One state isn't enough.** Filling column by column, a column boundary isn't always flush: a horizontal domino can stick out into the next column, leaving a "bump." So you need a second quantity alongside "fully tiled up to here." Track two states:
+  - `f(n)` = ways to tile a full 3×n block (flush right edge),
+  - `g(n)` = ways to tile 3×n with exactly one cell protruding into column n+1 (a bump).
+
+  Coupled recurrence:
+  ```
+  f(n) = f(n-2) + 2*g(n-1)
+  g(n) = f(n-1) + g(n-2)
+  base: f(0)=1, f(1)=0, g(0)=0, g(1)=1
+  ```
+  The `2*g(n-1)` counts the two mirror-image bump orientations (top or bottom row). This form handles parity automatically — the odd terms come out 0 on their own.
+
+- **Closed form.** Eliminating `g` gives a clean recurrence over even n only: `f(n) = 4*f(n-2) - f(n-4)`, with `f(0)=1`, `f(2)=3`. Check: `f(4)=4·3-1=11`, `f(6)=4·11-3=41`, `f(8)=4·41-11=153`.
+
+### Complexity
+O(n) time and O(1) space either way (two rolling states for the coupled form, or four rolling values for the closed form). Values grow ~`(2+√3)^(n/2)`, so they overflow `long` eventually — use `BigInteger` for large n.
+
+### Notes
+- **Odd n → 0** is the first thing to handle; skip straight to returning 0 (or let the coupled recurrence produce it).
+- **`f(0) = 1`** — the empty board has one tiling.
+- The coupled two-state form is the honest "profile DP" and generalizes to other board heights; the `4f(n-2) - f(n-4)` closed form is specific to height 3 and is what you'd use once you trust it. Either is fine — the closed form is fewer lines, the coupled form is more instructive.
+- Independent check: exhaustive backtracking (lay dominoes cell by cell) confirms the recurrence for small n — worth keeping as a test since the recurrence is easy to mis-transcribe.
+
+--- 
+
+## Domino_tromino_tiling
+
+**Problem.** Count the ways to fully tile a 2×n board using 2×1 dominoes and L-shaped trominoes. A tromino covers 3 cells — a 2×2 square minus one corner — in any of its 4 orientations. (LeetCode 790; answer taken modulo 1e9+7 since it grows exponentially.)
+
+### Idea
+Unlike the pure-domino 2×n case (which is plain Fibonacci), trominoes let a tile leave the column boundary *ragged* — one cell of a column can be filled while the other is still open, waiting on a piece from the next column. The clean way to capture that is two states:
+
+- `f(n)` = ways to tile a **fully filled** 2×n prefix (flush right edge),
+- `p(n)` = ways to tile 2×n with **exactly one cell of the last column protruding** (a ragged edge).
+
+Coupled recurrence:
+```
+f(n) = f(n-1) + f(n-2) + 2*p(n-1)
+p(n) = f(n-1) + p(n-1)
+```
+The `f(n-1)` and `f(n-2)` are the vertical- and double-horizontal-domino closings; the `2*p(n-1)` are the two tromino orientations that finish a ragged edge (top or bottom).
+
+Collapsing the two states into one gives the compact closed recurrence used in the code:
+```
+f(0) = 1, f(1) = 1, f(2) = 2
+f(n) = 2*f(n-1) + f(n-3)
+```
+which produces `1, 1, 2, 5, 11, 24, 53, 117, 258, 569, 1255, …` (verified against exhaustive backtracking).
+
+### Complexity
+O(n) time, O(1) space (roll the last three `f` values, or two states for the coupled form). Counts grow ~`1.8^n`, so **take everything modulo 1e9+7** — apply the mod after every addition so intermediate sums never overflow `long`.
+
+### Notes
+- **No parity shortcut here.** Unlike 3×n dominoes, a 2×n board with trominoes is tileable for every n ≥ 0 (trominoes cover 3 cells, so the "board must have even area" argument doesn't apply — two trominoes together cover 6 cells and pair up).
+- **Base cases `f(0)=1, f(1)=1, f(2)=2`** must all be seeded; the recurrence reaches back 3 steps.
+- **Mod discipline:** `f(n) = (2*f(n-1) + f(n-3)) % MOD`. Because `2*f(n-1)` can approach `2·MOD`, keep it in `long` and mod immediately; the result stays non-negative since all terms are non-negative.
+- The coupled `f`/`p` form is the more transferable "profile DP" and is what generalizes to wider boards or other tile sets; the `2f(n-1)+f(n-3)` closed form is the shortcut once you trust it.
+- Independent check: exhaustive backtracking that lays each domino/tromino covering the first empty cell confirms the recurrence for small n — worth keeping, since the recurrence and its base cases are easy to mis-seed.
+
+---
+
+## Mountain_scenes
+
+**Problem** (Kattis "scenes", NAIPC 2016). A ribbon of length `n` is cut into `w` columns, each filled from the bottom to an integer height in `[0, h]`. The total ribbon used (sum of column heights) must be at most `n` — she needn't use all of it. A **mountain** scene must be *uneven*: if every column is the same height it's a "plain," not a mountain. Count the distinct mountain scenes, modulo 1e9+7. (Two scenes differ iff the covered regions differ; at most one ribbon piece per column.)
+
+### Idea
+Count everything, then subtract the non-mountains — cleaner than counting mountains directly.
+
+**Total scenes** = number of height assignments `(c_1, …, c_w)` with each `c_i ∈ [0, h]` and `sum(c_i) ≤ n`. This is a DP over columns and ribbon used:
+```
+dp[j] = number of ways for the columns placed so far to use exactly j inches
+dp[0] = 1
+for each of the w columns:
+    next[j] = sum of dp[j - t] for t in 0..h   (add a column of height t)
+total = sum of dp[j] for j in 0..cap
+```
+Each column adds a contiguous window of the previous row, so a **prefix sum** makes the inner sum O(1) → O(w · cap) overall. Cap the ribbon dimension at `cap = min(n, w·h)`: the frame can't hold more than `w·h` inches, so any `n` beyond that is wasted and the total is just `(h+1)^w`.
+
+**Flat scenes** (the ones to remove): every column equal to some height `k`, using `w·k` inches, valid when `w·k ≤ n`. The number of such `k` in `[0, h]` is `min(h, floor(n/w)) + 1`.
+
+**Answer** = `(total − flat) mod 1e9+7`.
+
+### Complexity
+O(w · min(n, w·h)) time with the prefix-sum trick — at most 100 · 10000 = 10⁶ operations. O(cap) space (one rolling dp row plus a prefix array).
+
+### Notes
+- **"Uneven" means subtract all flats, not just the empty scene.** Every constant-height configuration (including all-zero and completely-full) is a plain. This is the subtlety the samples pin down — e.g. `25 5 5` gives `6^5 − 6 = 7770`.
+- **Cap the ribbon at `w·h`.** `n` can be 10000 while the frame holds far less; without the cap the dp array is needlessly huge (or you miscount). When `n ≥ w·h` the total is simply `(h+1)^w`.
+- **`w = 1` is always 0** — a single column is trivially uniform, so no scene is ever a mountain. Good sanity check.
+- **Mod discipline:** keep the dp sums under the modulus (mod after each addition), and compute the final `total − flat` as `(total − flat % MOD + MOD) % MOD` so the subtraction can't go negative after the total has wrapped.
+- Sample checks (all verified): `25 5 5 → 7770`, `15 5 5 → 6050`, `10 10 1 → 1022`, `4 2 2 → 6`.
+
+--- 
+
+## Narrow_art_gallery
+
+**Problem** (Kattis "narrowartgallery", 2014 NAQ). A gallery has N rows of 2 rooms (left, right), each room with a value. Exactly `k` rooms must be closed. To keep the gallery walkable top-to-bottom, you may **not** close two rooms in the same row, nor two rooms in adjacent rows that touch diagonally (left in one row and right in the next, or vice versa). Choose the `k` closures that leave the **maximum total value open**; report that value.
+
+### Idea
+Maximize the open value directly. Go row by row; the only thing a row needs to know about its predecessor is **which side (if any) the previous row closed**, because that's exactly what the no-diagonal rule constrains. So the state is `(row, rooms closed so far, previous row's closed side ∈ {none, left, right})`.
+
+Per row you have three moves:
+- **Close nothing** → both rooms stay open, add `left + right`, `k` unchanged, new side = none. Allowed after any previous side.
+- **Close left** → only the right room open, add `right`, spend one closure, new side = left. Allowed only if the previous side was **none or left** (closing left after a right-close is the forbidden diagonal).
+- **Close right** → only the left room open, add `left`, spend one closure, new side = right. Allowed only if previous side was **none or right**.
+
+`dp[i][j][s]` = max open value over rows `0..i` having closed exactly `j` rooms with row `i` in side-state `s`. Transition takes the best feasible predecessor state; the answer is `max` over the three side-states of `dp[N-1][k][·]`. Mark infeasible states as −∞ so they can't be chosen.
+
+### Complexity
+O(N · k · 3) states, O(1) work each → **O(N·k)** time. Space O(N·k) for the full table, or O(k) with a rolling row (each row depends only on the previous). Values are small ints; no overflow concern.
+
+### Notes
+- **"At most one per row" + "no diagonal" is the whole constraint.** Both fall out of the three-way side-state transition — you never need to look back more than one row.
+- **Exactly k, not at most k.** Track the closure count precisely and read the answer at `j == k`; seed unreachable counts as −∞ so a state that can't reach exactly `k` never wins.
+- **Feasibility.** Any `0 ≤ k ≤ N` is achievable — closing the left room in any `k` rows (all same side) satisfies both rules — so a valid answer always exists in range.
+- **Equivalent framings.** Maximizing open value equals `totalValue − (minimum closed value)`; some solutions (e.g. Fiset's recursive one) minimize the closed sum instead. Same optimum, just complement.
+- Sample checks (verified via DP and an independent subset brute): `17`, `17`, `102`.
