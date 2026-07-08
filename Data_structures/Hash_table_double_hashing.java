@@ -191,7 +191,6 @@ public class Hash_table_double_hashing<K, V> {
             } else if(this.table[current_index].equals(TOMBSTONE)){
                 tombstone_position = current_index;
             } else if(((Entry<K,V>)this.table[current_index]).key.equals(key)){
-                Entry<K,V> temp = (Entry<K,V>)this.table[current_index];
                 if(tombstone_position != -1){
                     this.table[tombstone_position] = this.table[current_index];
                     this.table[current_index] = TOMBSTONE;
