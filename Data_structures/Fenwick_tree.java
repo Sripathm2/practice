@@ -1,5 +1,4 @@
 package Data_structures;
-import java.util.Arrays;
 import java.util.Objects;
 
 // Fenwick tree (Binary Indexed Tree) over long values, fixed size.

@@ -490,3 +490,128 @@ O(n·W) time and O(n·W) space — the space is now mandatory, since reconstruct
 - **The "equal ⇒ skipped" rule is a tie-break.** When taking and skipping an item yield the same value, this convention skips it, producing one specific optimal set. A different rule (prefer taking on ties) yields a different but equally optimal set — so **the item set isn't unique in general**, only the value is. That's why a good test validates the returned set (distinct, fits capacity, sums to the optimal value) rather than demanding one exact answer, except where the optimum is unique.
 - **Return items ascending.** The backward walk collects indices from `n-1` down to `0`, so reverse them (or push-front) before returning.
 - **Value-only vs items:** the plain `maxValue` and this `maxValueWithItems` must agree on the value for every input — a cheap consistency check between the two versions.
+
+---
+
+# Graphs — Overview
+
+A **graph** is a set of vertices (nodes) connected by edges. It's the most general of the structures here: trees, linked lists, and grids are all special cases. Almost any "things and the relationships between them" problem is a graph problem.
+
+## Kinds of graphs
+- **Undirected** — edges have no direction; `u—v` means you can travel both ways.
+- **Directed (digraph)** — edges are one-way arrows; `u→v` does not imply `v→u`.
+- **Weighted** — each edge carries a value (cost, distance, capacity). Unweighted graphs are the weight-1 special case.
+- **Tree** — a connected, acyclic undirected graph; `n` vertices and exactly `n−1` edges, with a unique path between any two vertices.
+- **Rooted tree** — a tree with one vertex designated the root, giving every edge a direction: an **out-tree** (edges point away from the root, the usual case) or an **in-tree** (edges point toward the root).
+- **DAG (directed acyclic graph)** — a digraph with no directed cycles. Models dependencies/orderings; admits a topological sort and underlies most DP-on-graphs.
+- **Bipartite** — vertices split into two sets with edges only *between* the sets. Equivalent to being **2-colorable** and to having **no odd-length cycle**.
+- **Complete graph** — every pair of distinct vertices is joined by exactly one edge (`n(n−1)/2` edges undirected).
+
+## Representations
+How you store the graph drives every algorithm's cost. Let `V` = number of vertices, `E` = number of edges.
+
+- **Adjacency matrix** — a `V × V` grid; cell `(u, v)` holds the edge (presence/weight). Edge and weight lookup is **O(1)**, but it uses **O(V²)** memory and iterating all edges is **O(V²)**. Best for **dense** graphs.
+- **Adjacency list** — each vertex stores a list of its outgoing edges. Memory is **O(V + E)** and iterating a vertex's neighbors is **O(degree)**; a specific edge/weight lookup is **O(degree)**. Best for **sparse** graphs (the common case).
+- **Edge list** — a flat list of `(u, v, w)` triples. Compact and simple, natural for algorithms that just sweep all edges (e.g. Kruskal's MST), but poor for "who are v's neighbors?" queries. Bad for dense or very large graphs where you need adjacency.
+
+## Problems & algorithms this unlocks
+- **Shortest path** — BFS (unweighted), Dijkstra (non-negative weights), Bellman-Ford (handles negatives), Floyd-Warshall (all pairs).
+- **Detecting negative cycles** — Bellman-Ford flags them.
+- **Strongly connected components** — Tarjan's / Kosaraju's on digraphs.
+- **Traveling salesman** — min-cost tour visiting every vertex (Held-Karp DP).
+- **Bridges and articulation points** — a **bridge** is an edge whose removal increases the number of connected components; the vertex analogue is an **articulation point**. Found with a DFS low-link pass.
+- **Minimum spanning tree** — cheapest set of edges connecting all vertices (Kruskal, Prim).
+- **Maximum flow** — most flow routable from source to sink (Ford-Fulkerson / Dinic).
+
+Most of these are built on two traversals — **DFS** and **BFS** — so those come first.
+
+---
+
+## Graph_adjacency_matrix
+
+A graph stored as a `V × V` grid: cell `(u, v)` records whether the edge `u → v` exists and, if weighted, its weight. Implements the common `Graph` interface so algorithms don't care which representation they're handed.
+
+### Positives
+- **O(1) edge and weight lookup** — "is there an edge `u → v`?" and "what's its weight?" are single array reads.
+- Simple and cache-friendly; trivial to add, remove, or update an edge in O(1).
+- Best for **dense** graphs (edges near `V²`), where the matrix is mostly full anyway.
+
+### Negatives
+- **O(V²) memory** regardless of how few edges exist — wasteful for sparse graphs.
+- **Listing a vertex's neighbors is O(V)** — you scan its whole row even if it has one neighbor.
+- Iterating all edges is O(V²). For a graph with `V = 10⁵`, the matrix alone is `10¹⁰` cells — infeasible.
+
+### Algorithm / thought process
+Keep an `n`-vertex graph in two `n × n` arrays: a boolean `present[u][v]` (does the edge exist) and an int `weight[u][v]` (its weight, valid only where present). Splitting presence from weight avoids the ambiguity of "is a 0 in the cell a weight-0 edge or no edge?".
+
+- **addEdge(u, v, w):** set `present[u][v] = true`, `weight[u][v] = w`; if **undirected**, mirror into `[v][u]`. Re-adding an existing edge just overwrites the weight and must **not** bump the edge count.
+- **hasEdge(u, v):** return `present[u][v]` — O(1).
+- **weight(u, v):** return `weight[u][v]`, or throw if not present.
+- **neighbors(v):** scan row `v` and collect every `u` with `present[v][u]` — O(V), naturally in ascending order.
+- **edgeCount:** track it as you add; for undirected, count each edge once (increment only when the edge is genuinely new).
+
+The whole trade is memory and neighbor-iteration cost (both tied to `V`) in exchange for constant-time edge lookup. Reach for it when the graph is dense or when you're doing lots of "does this specific edge exist?" queries.
+
+---
+
+## Graph_adjacency_list
+
+A graph stored as, per vertex, a list of its outgoing edges (each edge a `(neighbor, weight)` pair). Implements the common `Graph` interface. This is the default representation for most graph work.
+
+### Positives
+- **O(V + E) memory** — you store exactly the edges that exist, nothing more. Ideal for **sparse** graphs (the common case).
+- **Neighbor iteration is O(degree)** — walking a vertex's edges touches only its real neighbors, which is exactly what DFS/BFS/Dijkstra do repeatedly.
+- Scales to huge graphs where a `V × V` matrix wouldn't fit.
+
+### Negatives
+- **Edge/weight lookup is O(degree)** — checking "is there an edge `u → v`?" means scanning `u`'s list (a matrix does this in O(1)).
+- Slightly more pointer/object overhead per edge than a flat matrix cell.
+- Neighbors aren't inherently sorted; if an algorithm needs a deterministic order you sort them (or keep the list ordered on insert).
+
+### Algorithm / thought process
+Hold a list-of-lists: `adj.get(u)` is the list of edges leaving `u`. Each edge stores its destination and weight (a tiny `Edge {to, weight}`).
+
+- **addEdge(u, v, w):** append an `Edge(v, w)` to `adj.get(u)`; if **undirected**, also append `Edge(u, w)` to `adj.get(v)`. Re-adding an existing edge should update that edge's weight in place rather than appending a duplicate (and must not double-count).
+- **hasEdge(u, v):** scan `adj.get(u)` for an edge to `v` — O(degree).
+- **weight(u, v):** same scan; return the weight or throw if absent.
+- **neighbors(v):** map `adj.get(v)` to destination vertices; return them **ascending** (sort, or keep the list sorted) so traversals are deterministic.
+- **edgeCount:** maintain a counter, incremented only when a genuinely new edge is added (once per undirected edge, not once per stored direction).
+
+The trade is the mirror image of the matrix: cheap memory and cheap neighbor iteration, at the cost of O(degree) edge lookups. Because traversal algorithms iterate neighbors far more than they test individual edges, the adjacency list is the right default for all but the densest graphs.
+
+---
+
+## Depth_first_search
+
+Traverse a graph by diving as deep as possible along each branch before backtracking. DFS is the workhorse behind connectivity, cycle detection, topological sort, bridges/articulation points, and strongly connected components.
+
+### Idea
+Start at a vertex, mark it visited, and recurse into its first unvisited neighbor — going *deep* before *wide*. When a vertex has no unvisited neighbors, back up to the previous vertex and try its next one. The **visited set** is essential: without it, cycles send you looping forever and shared vertices get processed repeatedly.
+
+```
+dfs(v):
+    mark v visited
+    (pre-order work on v)
+    for each neighbor w of v:
+        if w not visited:
+            dfs(w)
+    (post-order work on v)
+```
+
+Two natural outputs:
+- **Preorder** — the order vertices are first visited (record `v` when you enter `dfs(v)`).
+- **Postorder** — the order vertices finish (record `v` after the loop); the reverse of postorder is a topological sort on a DAG.
+
+To cover a possibly-disconnected graph, run DFS from every not-yet-visited vertex; each launch starts a new **DFS tree**, and the number of launches is the number of connected components (for undirected graphs).
+
+### Complexity
+O(V + E) — each vertex is entered once and each edge is examined once (twice for undirected, once per stored direction). O(V) extra space for the visited array plus the recursion/stack depth, which can reach V on a long path.
+
+### Notes
+- **Recursion vs explicit stack.** The natural form is recursive; on deep graphs (V up to ~10⁵) that risks a stack overflow, so an iterative version with an explicit stack is the safe alternative. Same O(V+E) work.
+- **DFS vs BFS.** Both are O(V+E) and both visit everything reachable; they differ in *order*. DFS uses a stack (goes deep) and is the tool for topological sort, cycle detection, and low-link algorithms. BFS uses a queue (goes level by level) and gives shortest paths in **unweighted** graphs — DFS does not.
+- **Directed vs undirected.** The traversal code is identical; only the neighbor sets differ. "Connected components via DFS-from-every-vertex" is meaningful for undirected graphs; for digraphs the analogous notion is strongly connected components, which needs more than plain DFS.
+- **Determinism.** Visiting neighbors in ascending order (as `Graph.neighbors` guarantees) makes the traversal order reproducible — important for testing, irrelevant to correctness.
+- **Reachability** falls straight out of DFS: whatever it marks visited from `start` is exactly the set reachable from `start`.
+
+---

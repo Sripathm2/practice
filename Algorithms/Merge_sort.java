@@ -1,5 +1,4 @@
 package Algorithms;
-import java.util.Objects;
 import java.util.Arrays;
 
 // Merge sort on a 1D array (divide and conquer): split the array in half,

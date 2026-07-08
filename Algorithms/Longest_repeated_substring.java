@@ -1,7 +1,6 @@
 package Algorithms;
 import Data_structures.Suffix_array;
 
-import java.util.Arrays;
 import java.util.Objects;
 
 // Find the longest substring that occurs at least twice in a string.
