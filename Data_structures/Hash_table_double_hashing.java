@@ -145,6 +145,7 @@ public class Hash_table_double_hashing<K, V> {
 
     // Return the value mapped to key, or null if key is absent.
     // Throw NullPointerException if key is null.
+    @SuppressWarnings("unchecked")
     public V get(K key) {
         if(key == null){
             throw new NullPointerException();
@@ -174,6 +175,7 @@ public class Hash_table_double_hashing<K, V> {
 
     // Return true if key has a mapping.
     // Throw NullPointerException if key is null.
+    @SuppressWarnings("unchecked")
     public boolean containsKey(K key) {
         if(key == null){
             throw new NullPointerException();
@@ -190,7 +192,6 @@ public class Hash_table_double_hashing<K, V> {
                 tombstone_position = current_index;
             } else if(((Entry<K,V>)this.table[current_index]).key.equals(key)){
                 Entry<K,V> temp = (Entry<K,V>)this.table[current_index];
-                V returnV = temp.value;
                 if(tombstone_position != -1){
                     this.table[tombstone_position] = this.table[current_index];
                     this.table[current_index] = TOMBSTONE;
@@ -204,6 +205,7 @@ public class Hash_table_double_hashing<K, V> {
     // Remove the mapping for key.
     // Return the removed value, or null if key was absent.
     // Throw NullPointerException if key is null.
+    @SuppressWarnings("unchecked")
     public V remove(K key) {
         if(key == null){
             throw new NullPointerException();
@@ -240,6 +242,7 @@ public class Hash_table_double_hashing<K, V> {
     // Return "{k1=v1, k2=v2, ...}" over all live mappings, order unspecified.
     // Empty table returns "{}".
     @Override
+    @SuppressWarnings("unchecked")
     public String toString() {
         String output = "{";
         for(int index = 0; index < this.table.length; index++){

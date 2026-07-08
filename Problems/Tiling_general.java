@@ -121,7 +121,6 @@ class Tiling_general_Main {
         checkEquals("no tiles n=1", 0L, Tiling_general.countWays(1, new int[]{}, new int[]{}));
 
         // --- Cross-check against brute over varied tile sets and n ---
-        java.util.Random rng = new java.util.Random(61);
         int[][] sets = {
             {1, 2}, {1, 1},
             {1, 2, 3}, {2, 1, 3},

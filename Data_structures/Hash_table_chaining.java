@@ -20,7 +20,6 @@ public class Hash_table_chaining<K, V> {
     private int capacity;
 
     private static final int DEFAULT_CAPACITY = 16;
-    private static final double MAX_LOAD_FACTOR = 0.75;
 
     // Construct an empty table with the default capacity.
     public Hash_table_chaining() {
@@ -77,6 +76,7 @@ public class Hash_table_chaining<K, V> {
 
     // Return the value mapped to key, or null if key is absent.
     // Throw NullPointerException if key is null.
+    @SuppressWarnings("unchecked")
     public V get(K key) {
         if(key == null){
             throw new NullPointerException();
@@ -98,6 +98,7 @@ public class Hash_table_chaining<K, V> {
 
     // Return true if key has a mapping.
     // Throw NullPointerException if key is null.
+    @SuppressWarnings("unchecked")
     public boolean containsKey(K key) {
         if(key == null){
             throw new NullPointerException();
@@ -120,6 +121,7 @@ public class Hash_table_chaining<K, V> {
     // Remove the mapping for key.
     // Return the removed value, or null if key was absent.
     // Throw NullPointerException if key is null.
+    @SuppressWarnings("unchecked")
     public V remove(K key) {
         if(key == null){
             throw new NullPointerException();
