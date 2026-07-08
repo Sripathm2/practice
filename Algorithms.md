@@ -646,3 +646,37 @@ O(V + E) time — each vertex enqueued once, each edge examined once. O(V) space
 - **`parent[start] = -1`** marks the root of the search and is the stop condition for the backward walk.
 - **Ties.** When several shortest paths exist, which one you reconstruct depends on neighbor order (ascending here) and first-parent-wins. All are equally short; the length is unique even though the path isn't.
 - **BFS vs DFS.** Same O(V+E), same "visit everything reachable," opposite order: queue (wide) vs stack/recursion (deep). BFS → unweighted shortest paths, level structure, bipartite checking. DFS → topological sort, cycle detection, bridges/SCC. Reach for BFS whenever "fewest edges" or "closest first" matters.
+
+---
+## Grid_shortest_path
+
+**Problem.** Given a rectangular grid where `0` is open and `1` is a wall, find the fewest 4-directional moves (up/down/left/right) from a start cell to a target cell, stepping only on open cells. Return the move count, or `-1` if the target can't be reached.
+
+### Idea
+The grid *is* a graph, just implicit: each open cell is a vertex, and each pair of orthogonally adjacent open cells is an edge. Every move costs 1, so this is unweighted shortest path → **BFS**. You never build an explicit graph; you generate neighbors on the fly from the coordinates.
+
+```
+if start or target is a wall: return -1
+dist[start] = 0; enqueue start; mark visited
+while queue not empty:
+    (r, c) = dequeue
+    if (r,c) == target: return dist[r][c]
+    for each of the 4 directions (dr, dc):
+        (nr, nc) = (r+dr, c+dc)
+        if in bounds, open, and not visited:
+            mark visited; dist[nr][nc] = dist[r][c] + 1; enqueue (nr, nc)
+return -1        # target never dequeued
+```
+
+The four directions are the edge set of every cell: `{(-1,0),(1,0),(0,-1),(0,1)}`. A cell's "neighbors" are just those four offsets, filtered to in-bounds, open, unvisited.
+
+### Complexity
+O(R·C) time and space — each cell is enqueued at most once and each has ≤ 4 neighbors, so total work is linear in the number of cells.
+
+### Notes
+- **Same BFS rules as the graph version.** Mark visited **on enqueue** (not dequeue) so no cell enters the queue twice. Distances propagate as `dist[neighbor] = dist[current] + 1`.
+- **Reject wall endpoints up front.** If the start or target is a wall, there's no path — return −1 before starting, or the BFS will just never reach the target and you'll return −1 anyway, but the explicit check is clearer.
+- **Bounds check every neighbor.** The `(nr, nc)` must be inside `[0,R) × [0,C)` before you index `grid[nr][nc]` — the edge cells are where an out-of-bounds access hides.
+- **Path reconstruction** works exactly like the graph BFS: keep a `parent[r][c]` (store the previous cell, e.g. as an encoded index `r*C + c`), and walk it back from the target, reversing to get start→target. Only the distance is asked here, but the machinery is identical.
+- **Variants** slot in cleanly: 8-directional movement (add the 4 diagonals to the direction list), multiple sources (enqueue them all at distance 0), or weighted terrain (that breaks the unit-cost assumption → use Dijkstra / 0-1 BFS instead of plain BFS).
+- **Early exit** on dequeuing the target is a valid optimization; without it you just finish the BFS and read `dist[target]`.
