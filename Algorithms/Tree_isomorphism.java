@@ -2,13 +2,7 @@ package Algorithms;
 import java.util.Objects;
 import java.util.List;
 import java.util.ArrayList;
-<<<<<<< HEAD
 import Data_structures.Tree_node;
-=======
-import Algorithms.Tree_center;
-import Data_structures.Tree_node;
-import Algorithms.Root_tree;
->>>>>>> 46dfeff6cd7938beace2f4ba043fc8176dc49478
 
 // Tree isomorphism: are two undirected trees the same shape, ignoring labels?
 // The AHU approach: root each tree at its center, then encode each rooted tree

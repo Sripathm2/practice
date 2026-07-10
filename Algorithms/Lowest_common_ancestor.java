@@ -1,20 +1,11 @@
 package Algorithms;
 import java.util.Objects;
 
-<<<<<<< HEAD
 import Data_structures.Sparse_table;
 import Data_structures.Tree_node;
 import java.util.List;
 import java.util.ArrayList;
-=======
-import Data_structures.Graph;
-import Data_structures.Sparse_table;
-import Data_structures.Tree_node;
 
-import java.util.List;
-import java.util.ArrayList;
-import java.util.HashMap;
->>>>>>> 46dfeff6cd7938beace2f4ba043fc8176dc49478
 import java.util.Hashtable;
 
 // Lowest Common Ancestor in a rooted tree. Build once from an undirected tree and

@@ -2,10 +2,6 @@ package Algorithms;
 import java.util.Objects;
 
 import Data_structures.Graph;
-<<<<<<< HEAD
-=======
-import Data_structures.Topological_sort_kahn;
->>>>>>> 46dfeff6cd7938beace2f4ba043fc8176dc49478
 
 import java.util.List;
 import java.util.ArrayList;

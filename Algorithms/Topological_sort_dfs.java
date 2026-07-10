@@ -72,19 +72,6 @@ class Topological_sort_dfs_Main {
     private static int passed = 0;
     private static int failed = 0;
 
-<<<<<<< HEAD
-=======
-    private static void checkEquals(String name, Object expected, Object actual) {
-        if (Objects.equals(expected, actual)) {
-            passed++;
-            System.out.println("PASS: " + name);
-        } else {
-            failed++;
-            System.out.println("FAIL: " + name + " — expected <" + expected + ">, got <" + actual + ">");
-        }
-    }
-
->>>>>>> 46dfeff6cd7938beace2f4ba043fc8176dc49478
     private static void checkTrue(String name, boolean cond) {
         if (cond) { passed++; System.out.println("PASS: " + name); }
         else      { failed++; System.out.println("FAIL: " + name); }
