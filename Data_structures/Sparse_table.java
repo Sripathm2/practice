@@ -12,6 +12,7 @@ import java.util.function.BinaryOperator;
 //                   and also works for the idempotent ones.
 public class Sparse_table<T> {
     private Object[][] table;   // table[i][j] = F over [j, j + 2^i)
+    private int[][] index_table;   // table[i][j] = F over [j, j + 2^i)
     private int[] log;          // log[len] = floor(log2(len))
     private BinaryOperator<T> op;
     private int n;
@@ -25,9 +26,11 @@ public class Sparse_table<T> {
         this.P = (int) (Math.log(this.n)/Math.log(2));
 
         this.table = new Object[this.P +1][this.n];
+        this.index_table = new int[this.P +1][this.n];
 
         for(int index = 0; index < this.n ; index++){
             this.table[0][index] = arr[index];
+            this.index_table[0][index] = index;
         }
 
         this.op = op;
@@ -42,6 +45,14 @@ public class Sparse_table<T> {
                 T left_interval_value = (T)this.table[row-1][col];
                 T right_interval_value = (T)this.table[row-1][col+(1<<(row-1))];
                 this.table[row][col] = this.op.apply(left_interval_value, right_interval_value);
+
+                if(left_interval_value instanceof Integer){
+                    if((int)left_interval_value <= (int)right_interval_value){
+                        index_table[row][col] = index_table[row-1][col];
+                    }else{
+                        index_table[row][col] = index_table[row-1][col + (1<<(row-1))];
+                    }
+                }
             }
         }
     }
@@ -66,6 +77,24 @@ public class Sparse_table<T> {
         T left_interval_value = (T)this.table[p][l];
         T right_interval_value = (T)this.table[p][r-k+1];
         return this.op.apply(left_interval_value, right_interval_value);
+    }
+
+    public int queryOverlap_index_min_operation_only(int l, int r) {
+        if(l < 0 || r >= this.n){
+            throw new IndexOutOfBoundsException();
+        }else if(l > r){
+            throw new IllegalArgumentException();
+        }
+        int p = this.log[r-l+1];
+        int k = 1 << p;
+        int left_interval_value = (int)this.table[p][l];
+        int right_interval_value = (int)this.table[p][r-k+1];
+
+        if(left_interval_value <= right_interval_value){
+            return this.index_table[p][l];
+        }else{
+            return this.index_table[p][r-k+1];
+        }
     }
 
     // Range query over [l, r] inclusive for any associative F (O(log n)).

@@ -680,3 +680,221 @@ O(R·C) time and space — each cell is enqueued at most once and each has ≤ 4
 - **Path reconstruction** works exactly like the graph BFS: keep a `parent[r][c]` (store the previous cell, e.g. as an encoded index `r*C + c`), and walk it back from the target, reversing to get start→target. Only the distance is asked here, but the machinery is identical.
 - **Variants** slot in cleanly: 8-directional movement (add the 4 diagonals to the direction list), multiple sources (enqueue them all at distance 0), or weighted terrain (that breaks the unit-cost assumption → use Dijkstra / 0-1 BFS instead of plain BFS).
 - **Early exit** on dequeuing the target is a valid optimization; without it you just finish the BFS and read `dist[target]`.
+
+
+---
+
+## Root_tree
+
+Turn an undirected tree into a rooted one by choosing a root and orienting every edge away from it.
+
+### Idea
+An undirected tree has no inherent parent/child direction — that only appears once you pick a root. Do a DFS from the chosen root; for each neighbor that isn't the node you came from, that neighbor is a child, so create it, link parent↔child, and recurse. The "came from" check is what stops you from walking back up the edge you just descended (there are no other cycles to worry about, since it's a tree).
+
+```
+build(node, parent):
+    for each neighbor w of node in adj:
+        if w != parent:            # don't go back the way you came
+            child = new Tree_node(w, node)
+            node.children.add(child)
+            build(child, node)
+```
+
+### Complexity
+O(n) — each vertex and edge is touched once. O(n) recursion depth in the worst case (a path).
+
+### Notes
+- **The only guard needed is "skip the parent."** A tree has no other cycles, so you don't need a visited set — tracking the immediate parent is enough.
+- **Re-rooting the same tree gives a different structure.** Parent/child relationships are relative to the root; rooting at a leaf vs. the center produces different shapes of the same underlying tree.
+- Deep trees can overflow the recursion stack; an explicit stack works identically.
+
+---
+
+## Leaf_node_sum
+
+Sum the ids of all leaves in a rooted tree (a leaf is a node with no children).
+
+### Idea
+A post-order recursion: if a node has no children it's a leaf and contributes its own id; otherwise it contributes the summed contributions of its subtrees.
+
+```
+sum(node):
+    if node is a leaf: return node.id
+    total = 0
+    for each child c: total += sum(c)
+    return total
+```
+
+### Complexity
+O(n) time, O(height) stack.
+
+### Notes
+- **A single-node tree is a leaf** — its root has no children, so it contributes its own id. Handle that base case, don't assume "root = internal."
+- Trivially adapts to summing a stored value per node, counting leaves, or finding the deepest leaf — the skeleton is the same tree walk, only the per-node contribution changes.
+
+---
+
+## Tree_center
+
+Find the 1 or 2 vertices at the middle of an undirected tree (the center of its longest path).
+
+### Idea
+Peel leaves inward. Repeatedly remove every current leaf (degree ≤ 1) as a whole layer, decrementing neighbors' degrees so new leaves surface, until only **1 or 2** vertices remain. Those survivors are the center(s) — a tree always has exactly one or two, depending on whether its longest path has an odd or even number of vertices.
+
+```
+degree[v] = len(adj[v]);  leaves = all v with degree <= 1;  remaining = n
+while remaining > 2:
+    next = []
+    for each leaf: remaining--; for each neighbor: degree--; if degree == 1: next.add(neighbor)
+    leaves = next
+return the surviving 1 or 2 vertices
+```
+
+### Complexity
+O(n) — this is a topological-style peel; each vertex leaves the frontier once.
+
+### Notes
+- **Always 1 or 2 centers.** Odd-length longest path → one center; even-length → two adjacent centers. Never zero, never three.
+- **Small trees are base cases:** `n == 1` → the lone vertex; `n == 2` → both vertices. Your loop condition `remaining > 2` handles these by never entering the loop.
+- This is exactly the "trim leaves layer by layer" idea (a.k.a. the minimum-height-trees algorithm) — the center minimizes the tree's height when chosen as root.
+
+---
+
+## Tree_isomorphism
+
+Decide whether two undirected trees have the same shape, ignoring vertex labels.
+
+### Idea
+Use the **AHU (Aho–Hopcroft–Ullman) canonical encoding**. First reduce the unrooted problem to a rooted one by rooting each tree at its **center** — isomorphic trees have centers that correspond, so this anchors the comparison. Then encode each rooted tree into a canonical string:
+
+```
+encode(node, parent):
+    labels = [ encode(child, node) for each child ]
+    sort labels                       # sibling order must not matter
+    return "(" + concat(labels) + ")"
+```
+
+A leaf encodes as `"()"`. Two rooted trees are isomorphic **iff their encodings are identical**. Sorting the child labels at every node is what makes the encoding independent of the arbitrary neighbor order.
+
+For the unrooted trees: root tree A at its (first) center and encode it; a tree can have two centers, so root tree B at **each** of its centers and compare — if either encoding matches A's, they're isomorphic.
+
+### Complexity
+O(n log n) with string sorting of child labels (O(n²) in the pathological string-concat worst case, still fine for these sizes). Center + rooting are O(n).
+
+### Notes
+- **Different sizes → immediately not isomorphic.** Check `n` first.
+- **Root at the center, not an arbitrary vertex.** Rooting both at, say, vertex 0 would compare structure relative to labels — wrong. The center is a label-independent anchor.
+- **Two-center subtlety:** try both of one tree's centers against the other's single chosen center, since which center maps to which isn't known in advance.
+- **Sorting siblings is essential.** Without sorting the child encodings, the same tree drawn with children in a different order would produce different strings and falsely read as non-isomorphic.
+- Verified pairs: A ≅ B (relabeled), A ≇ path, star ≇ path, single ≅ single.
+
+---
+
+## Lowest_common_ancestor
+
+The lowest common ancestor of `u` and `v` in a rooted tree is the deepest node that is an ancestor of both.
+
+### Idea
+Preprocess once: root the tree and record each node's **parent** and **depth** (a single DFS/BFS from the root). Then for a query, bring the two nodes to the same depth and walk them up together:
+
+```
+lca(u, v):
+    while depth[u] > depth[v]: u = parent[u]     # lift deeper node
+    while depth[v] > depth[u]: v = parent[v]      # lift the other
+    while u != v: u = parent[u]; v = parent[v]    # climb in lockstep
+    return u
+```
+
+Once both are at equal depth, moving both up one step at a time keeps them level, and the first place they coincide is their lowest common ancestor. If one is an ancestor of the other, the depth-equalizing step alone lands on it.
+
+### Complexity
+O(n) preprocessing, O(height) per query (up to O(n) on a degenerate path). Binary lifting brings queries to O(log n) after O(n log n) preprocessing; an Euler-tour + sparse-table (RMQ) gives O(1) queries after O(n log n) — worth reaching for when there are many queries.
+
+### Notes
+- **Ancestry is relative to the root.** Re-rooting changes every LCA. Root once, then query.
+- **`parent[root] = -1`, `depth[root] = 0`** anchor the walk; a node is its own ancestor, so `lca(u, u) == u`.
+- The simple "equalize then climb" version needs no extra structure beyond `parent[]` and `depth[]` — reach for binary lifting only when per-query O(height) is too slow.
+
+---
+
+## Topological_sort_dfs
+
+A topological ordering of a DAG lists its vertices so that every edge `u → v` has `u` before `v`. (Only directed *acyclic* graphs have one.)
+
+### Idea
+DFS and record each vertex when it **finishes** (post-order — after all its descendants are done). The reverse of that finish order is a topological order: a vertex finishes only after everything reachable from it, so reversing puts it before them.
+
+```
+for each unvisited vertex: dfs(v)
+dfs(v):
+    mark v "in progress"
+    for each out-neighbor w:
+        if w in progress: CYCLE  -> no ordering exists
+        if w unvisited:   dfs(w)
+    mark v "done"; push v onto the output stack
+reverse the stack (or the append order) => topological order
+```
+
+**Cycle detection** rides along: three colors — unvisited / in-progress (on the recursion stack) / done. An edge to an *in-progress* vertex is a back edge, which means a cycle, so no ordering exists.
+
+### Complexity
+O(V + E) — every vertex and edge visited once. O(V) stack/recursion space.
+
+### Notes
+- **Reverse the post-order.** Appending on finish gives the ordering *backwards*; reverse it (or push onto a stack and pop). Forgetting to reverse is the classic bug.
+- **Two colors aren't enough for cycle detection.** You must distinguish "on the current recursion stack" from "fully done" — an edge to a done vertex is fine (cross/forward edge), only an edge to an on-stack vertex is a cycle.
+- The output isn't unique; any order respecting all edges is valid.
+
+---
+
+## Topological_sort_kahn
+
+Same goal — a topological order of a DAG — built with in-degrees and a queue instead of recursion.
+
+### Idea
+A vertex can come next in the order exactly when it has no remaining incoming edges. So: compute every vertex's **in-degree**, seed a queue with all in-degree-0 vertices, then repeatedly pull one out, append it, and "remove" its outgoing edges by decrementing each out-neighbor's in-degree — enqueuing any that drop to 0.
+
+```
+compute indeg[v] for all v
+queue = all v with indeg[v] == 0
+order = []
+while queue not empty:
+    v = dequeue; order.add(v)
+    for each out-neighbor w: indeg[w]--; if indeg[w] == 0: enqueue w
+if order.size() < V: CYCLE  -> some vertices never reached in-degree 0
+```
+
+### Complexity
+O(V + E) — each vertex enqueued once, each edge relaxed once. O(V) for the queue and in-degree array.
+
+### Notes
+- **The count is the cycle test.** If the loop emits fewer than `V` vertices, the leftovers are trapped in a cycle (their in-degree never reaches 0). No separate coloring needed — Kahn's detects cycles for free.
+- **Kahn's vs DFS.** Same O(V+E), same "any valid order." Kahn's is iterative (no recursion-depth risk) and its intermediate state — the set of currently-available vertices — is meaningful (e.g. it exposes which tasks could run in parallel). DFS is terser and naturally yields the reverse-post-order used elsewhere (e.g. in SCC algorithms).
+- **Determinism:** replacing the plain queue with a min-priority queue yields the lexicographically smallest topological order, if you need a canonical one.
+
+--- 
+
+## Dag_shortest_longest_path
+
+Single-source shortest (or longest) path in a **weighted DAG**. Because the graph is acyclic, one pass in topological order solves it — no priority queue, no repeated relaxation, and negative weights are fine.
+
+### Idea
+Two steps:
+1. **Topologically sort** the DAG.
+2. **Relax edges in topo order.** Initialize `dist[source] = 0` and every other vertex to +∞ (shortest) or −∞ (longest). Walk vertices in topological order; for each vertex `u` whose `dist[u]` is finite, relax each outgoing edge `u → v`:
+   - shortest: `if dist[u] + w < dist[v]: dist[v] = dist[u] + w`
+   - longest:  `if dist[u] + w > dist[v]: dist[v] = dist[u] + w`
+
+Why one pass works: in topological order, **every edge into `u` comes from a vertex that appears earlier**, so by the time you process `u`, `dist[u]` is already final. You never need to revisit it. That's the whole payoff of the DAG structure.
+
+**Longest = shortest with the sign flipped.** Either flip the comparison and start from −∞ (as above), or negate every edge weight, run shortest path, and negate the result. Both give the longest path.
+
+### Complexity
+O(V + E) — the topo sort is O(V+E) and the relaxation pass touches each edge once. This *beats* Dijkstra's O((V+E) log V) and, unlike Dijkstra, it tolerates negative weights (safe here because a DAG can't contain a negative cycle — it can't contain any cycle).
+
+### Notes
+- **Only for DAGs.** If the graph has a cycle, no topological order exists — detect it (the topo sort fails / emits fewer than V vertices) and report "not a DAG." Longest path in a *general* graph is NP-hard; the DAG restriction is what makes it easy.
+- **Negative weights are allowed** and are the main reason to use this over Dijkstra when the graph happens to be acyclic.
+- **Skip unreachable vertices during relaxation.** Only relax out of a `u` whose `dist[u]` is finite; a vertex still at ±∞ has no path from the source yet, and adding a weight to ∞ is meaningless (and risks overflow). Unreachable vertices keep their ±∞ sentinel in the result.
+- **Use `long` for distances.** Summing many `int` weights (especially with a long path or large weights) overflows `int`; accumulate in `long`, and keep the ±∞ sentinels clear of the real range (e.g. `Long.MAX_VALUE` / `Long.MIN_VALUE`), skipping them so `sentinel + w` never wraps.
+- Verified: shortest from 0 → `[0,2,3,9,6,8,∞]`, longest → `[0,2,4,9,10,14,−∞]`; a negative-weight DAG routes the shortest path through the `−4` edge.
