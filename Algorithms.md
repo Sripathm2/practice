@@ -898,3 +898,140 @@ O(V + E) — the topo sort is O(V+E) and the relaxation pass touches each edge o
 - **Skip unreachable vertices during relaxation.** Only relax out of a `u` whose `dist[u]` is finite; a vertex still at ±∞ has no path from the source yet, and adding a weight to ∞ is meaningless (and risks overflow). Unreachable vertices keep their ±∞ sentinel in the result.
 - **Use `long` for distances.** Summing many `int` weights (especially with a long path or large weights) overflows `int`; accumulate in `long`, and keep the ±∞ sentinels clear of the real range (e.g. `Long.MAX_VALUE` / `Long.MIN_VALUE`), skipping them so `sentinel + w` never wraps.
 - Verified: shortest from 0 → `[0,2,3,9,6,8,∞]`, longest → `[0,2,4,9,10,14,−∞]`; a negative-weight DAG routes the shortest path through the `−4` edge.
+
+---
+
+## Dijkstra
+
+Single-source shortest paths on a graph with **non-negative** edge weights.
+
+### Idea
+Greedily settle vertices in increasing order of distance. Keep tentative distances; repeatedly pick the unsettled vertex with the smallest tentative distance (via a priority queue), finalize it, and relax its outgoing edges (`if dist[u] + w(u,v) < dist[v]: update`). Once a vertex is popped it's done — its distance can never improve, **because all weights are non-negative**, so no later, longer-prefix path can undercut it.
+
+```
+dist[source] = 0, rest = INF; pq = {(0, source)}
+while pq not empty:
+    (d, u) = pop-min
+    if d > dist[u]: continue          # stale entry, skip
+    for each edge u->v with weight w:
+        if dist[u] + w < dist[v]: dist[v] = dist[u] + w; push (dist[v], v)
+```
+
+### Complexity
+O((V + E) log V) with a binary-heap priority queue. An indexed PQ with decrease-key can tighten the constant; a plain heap with "push duplicates, skip stale" is simpler and just as good asymptotically.
+
+### Notes
+- **Non-negative weights only.** A single negative edge breaks the "settled = final" invariant — use Bellman-Ford instead.
+- **Lazy deletion.** Rather than decrease-key, push a new `(dist, v)` on every improvement and skip an entry when its stored distance is worse than `dist[v]` (`if d > dist[u]: continue`). Simplest correct approach with a standard heap.
+- Unreachable vertices keep the `INF`/`UNREACHABLE` sentinel.
+
+---
+
+## Bellman_ford
+
+Single-source shortest paths that tolerates **negative** weights and detects negative cycles.
+
+### Idea
+A shortest path visits at most `V-1` edges, so relaxing **every edge** `V-1` times is enough to settle all finite shortest distances (each pass extends the correctly-known frontier by one more edge). Then do `V-1` **more** passes: any edge that can *still* relax means its target is reachable from a negative cycle, so its true distance is `-infinity` — mark those `NEGATIVE_INF` and propagate.
+
+```
+dist[source] = 0, rest = INF
+repeat V-1 times: for each edge (u,v,w): if dist[u] finite and dist[u]+w < dist[v]: dist[v] = dist[u]+w
+repeat V-1 times: for each edge (u,v,w): if dist[u] finite and dist[u]+w < dist[v]: dist[v] = NEGATIVE_INF
+```
+
+### Complexity
+O(V·E) — `V-1` passes over all `E` edges (twice, for the negative-cycle sweep). Slower than Dijkstra, but it's the price of handling negatives.
+
+### Notes
+- **Guard against relaxing from an unreachable/`INF` vertex** — `INF + w` would overflow and leak a bogus finite distance. Only relax when `dist[u]` is finite.
+- **Two-phase detection.** The first `V-1` passes compute distances; the second `V-1` passes turn "still improving" into the `-infinity` marker, which must be *propagated* (a node fed by a `-infinity` node is also `-infinity`), hence a second full sweep, not a single pass.
+- **Early exit optimization:** if a full pass makes no change, distances are settled and you can stop (no negative cycle among reached vertices).
+
+---
+
+## Floyd_warshall
+
+**All-pairs** shortest paths; handles negative edges and detects negative cycles.
+
+### Idea
+Consider allowing paths to route through intermediate vertices `0, 1, …, k` one at a time. After considering intermediate `k`, `dist[i][j]` is the shortest path using only intermediates from `{0..k}`. The update is: could going `i → k → j` beat the current `i → j`?
+
+```
+dist[i][j] = weight(i,j)  (0 on the diagonal, INF if no edge)
+for k in 0..V-1:
+    for i in 0..V-1:
+        for j in 0..V-1:
+            if dist[i][k] + dist[k][j] < dist[i][j]: dist[i][j] = that sum
+```
+
+The triple loop order matters: **k is the outermost loop** — you finish incorporating intermediate `k` for all pairs before moving to `k+1`.
+
+### Complexity
+O(V³) time, O(V²) space. Beats running Dijkstra/Bellman-Ford from every source once the graph is dense, and it's dead simple to code.
+
+### Notes
+- **k must be the outer loop.** Swapping the loop order gives wrong answers — the DP relies on `dist[i][k]` and `dist[k][j]` being final for the current `k`.
+- **Negative cycle detection:** after the algorithm, if any `dist[i][i] < 0`, vertex `i` sits on a negative cycle. Pairs whose shortest path passes through such a cycle are `-infinity`.
+- **Overflow guard:** as in Bellman-Ford, skip `dist[i][k] + dist[k][j]` when either operand is the `INF` sentinel, or the addition overflows into a false improvement.
+
+---
+
+## Tarjan_scc
+
+Strongly connected components of a **directed** graph in a single DFS. An SCC is a maximal set of vertices where every vertex can reach every other.
+
+### Idea
+DFS the graph, assigning each vertex an increasing **index** (discovery time) and a **low-link** = the smallest index reachable from its DFS subtree, including via a single back-edge to a vertex still on an auxiliary **stack**. Push each vertex onto the stack when first visited. When a vertex `u` finishes with `low[u] == index[u]`, it's the **root** of an SCC: pop the stack down to and including `u` — those vertices are exactly one component.
+
+```
+dfs(u):
+    index[u] = low[u] = counter++; push u; onStack[u] = true
+    for each edge u->v:
+        if v unvisited: dfs(v); low[u] = min(low[u], low[v])
+        elif onStack[v]: low[u] = min(low[u], index[v])    # back-edge to stack
+    if low[u] == index[u]:                                  # u is an SCC root
+        pop vertices off the stack until u (inclusive) into a new component
+```
+
+### Complexity
+O(V + E) — one DFS. Optimal, and single-pass (unlike Kosaraju's two passes).
+
+### Notes
+- **Back-edge uses `index[v]`, tree-edge uses `low[v]`.** Updating `low[u]` from a *visited, on-stack* neighbor uses that neighbor's **index** (not its low-link); updating from a child in the DFS tree uses the child's **low**. Mixing these up is the classic Tarjan bug.
+- **Only on-stack neighbors count.** A visited neighbor already assigned to a finished SCC must be ignored (`onStack` guards this) — otherwise you'd merge components that aren't mutually reachable.
+- **Components come out in reverse topological order** of the condensation (the DAG of SCCs). Useful, but if you only need the grouping, the exact ids are arbitrary — test the partition, not the numbers.
+- A DAG has `V` singleton SCCs; a single directed cycle is one SCC of size `V`.
+- Verified: `{0,1,2},{3,4},{5}` for the linked-cycles graph; DAG → 3 singletons; ring → 1 component.
+
+---
+
+
+## Traveling_salesman
+
+**Problem.** Given `n` cities and the cost to travel between each pair (an `n × n` matrix), find the cheapest tour that starts at a city, visits every city exactly once, and returns to the start (a minimum-cost Hamiltonian cycle). Works for directed/asymmetric costs (`dist[i][j]` may differ from `dist[j][i]`).
+
+### Idea
+Brute force tries all `(n-1)!` orderings — hopeless past ~12 cities. The **Held-Karp** DP does far better by memoizing over *sets* of visited cities, exploiting that the cost of finishing a tour depends only on which cities remain and where you currently are, not on the order you visited the earlier ones.
+
+State: `dp[mask][i]` = minimum cost of a path that starts at city 0, has visited exactly the set of cities in the bitmask `mask`, and currently sits at city `i` (with bit `i` set in `mask`).
+
+```
+base:       dp[{0}][0] = 0                       (start at 0, only 0 visited)
+transition: for each state (mask, i) and each city j not in mask:
+              dp[mask | (1<<j)][j] = min(that, dp[mask][i] + dist[i][j])
+answer:     min over i of dp[fullMask][i] + dist[i][0]   (close the loop back to 0)
+```
+
+The bitmask encodes the visited set; fixing the start at city 0 removes the `n`-fold rotational symmetry (every cycle can be written starting at 0).
+
+### Complexity
+O(2ⁿ · n²) time — `2ⁿ` masks × `n` current-cities × `n` next-cities — and O(2ⁿ · n) space. Practical up to about n = 18–20. This is still exponential (TSP is NP-hard); Held-Karp is just far better than `(n-1)!` factorial brute force.
+
+### Notes
+- **Fix the start at city 0.** A tour is a cycle, so its cost is independent of where you "start" describing it; pinning start = 0 avoids counting each cycle `n` times and anchors the base case.
+- **Unreachable states need a sentinel.** Initialize `dp` to a large "infinity," and when combining `dp[mask][i] + dist[i][j]`, skip states still at infinity so they don't leak a bogus finite cost. Pick INF large enough to dominate real tours but small enough that `INF + dist` doesn't overflow `int` — or use `long`.
+- **Bit tricks:** `mask & (1<<i)` tests membership; `mask | (1<<j)` adds city `j`; `fullMask = (1<<n) - 1`. Iterate masks in increasing numeric order so every predecessor `mask` is finished before the states it extends.
+- **n = 1** is a degenerate tour of cost 0. **n = 2** is just `dist[0][1] + dist[1][0]`.
+- **Reconstruction** (the actual tour, not just the cost) works like knapsack's: store parent pointers or re-derive by checking which predecessor achieved each `dp` value, walking back from the closing state.
+- Sample checks (independently verified): symmetric 4-city → `80`, asymmetric 3-city → `3`.
