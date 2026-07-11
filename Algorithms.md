@@ -1118,3 +1118,167 @@ Lazy Prim: O(E log E) — every edge may enter the heap once. **Eager Prim** wit
 - **Ties → MST not unique.** When several edges share a weight, different valid MSTs exist; only the total weight is unique. Test the *total* (and that your edges form a spanning tree of that weight), not one specific edge set.
 - **Edge reconstruction** works like Dijkstra's: when you settle a vertex, remember the edge that brought it in; collect those `n-1` edges as the tree.
 - **Eager vs lazy** is purely an efficiency choice — the eager version replaces "push every crossing edge" with "keep the single best crossing edge per outside vertex in an indexed PQ," trimming heap size from O(E) to O(V).
+
+---
+
+## Ford_fulkerson
+
+**Problem.** In a flow network — a directed graph where each edge has a capacity — push as much flow as possible from a **source** to a **sink**, respecting capacities and conserving flow at every other vertex (in = out). Return the maximum total flow.
+
+### Idea
+Repeatedly find a path from source to sink that still has spare capacity (an **augmenting path**) and push flow along it, until no such path remains. The key mechanism is the **residual graph**: alongside each edge's remaining forward capacity, keep a **reverse residual edge** that lets a later path *cancel* earlier flow if that frees up a better routing.
+
+```
+residual = copy of capacity
+maxflow = 0
+while an augmenting path source->sink exists in residual (found via BFS):
+    bottleneck = min residual capacity along that path
+    for each edge (u,v) on the path:
+        residual[u][v] -= bottleneck      # consume forward capacity
+        residual[v][u] += bottleneck      # open reverse capacity (cancellation)
+    maxflow += bottleneck
+return maxflow
+```
+
+Using **BFS** to find the augmenting path (shortest in edge count) is the **Edmonds-Karp** refinement — it guarantees termination and a good bound. Generic Ford-Fulkerson allows any path (e.g. DFS), which works for integer capacities but can be slow.
+
+### Complexity
+Edmonds-Karp (BFS paths): **O(V·E²)**, independent of capacity magnitudes. Generic Ford-Fulkerson with DFS: O(E · maxflow), which is fine for small integer capacities but can degrade badly with large ones. With integer capacities the algorithm always terminates (each augmentation raises the flow by ≥ 1).
+
+### Notes
+- **The reverse residual edge is the whole trick.** `residual[v][u] += bottleneck` is what lets a subsequent augmenting path "undo" a suboptimal earlier commitment by pushing flow back. Without it, a greedy first path can strand the network below the true maximum (the "needs residual reroute" test exercises exactly this).
+- **Bottleneck = the minimum residual capacity on the path.** You can only push as much as the tightest edge allows; walk the path once to find it, then a second time to apply it.
+- **BFS over DFS for the path** (Edmonds-Karp) gives the polynomial O(V·E²) guarantee; a bad DFS order can make plain Ford-Fulkerson take a number of steps proportional to the flow value.
+- **Max-flow min-cut theorem:** the maximum flow equals the capacity of the minimum cut separating source from sink. After the final BFS, the vertices still reachable from the source in the residual graph form one side of a minimum cut — a handy way to *verify* the answer or extract the cut.
+- **Reverse edges of a capacity-0 pair.** When `u->v` has capacity but `v->u` doesn't, the reverse residual still needs a slot (it starts at 0 and grows as flow is pushed) — a matrix handles this automatically; an adjacency-list version must explicitly pair each edge with its reverse.
+- **Integer capacities** guarantee termination and an integer max flow; irrational capacities can, in pathological cases, make generic Ford-Fulkerson fail to terminate — another reason to prefer Edmonds-Karp.
+
+
+--- 
+
+
+# Bipartite Matching via Max Flow — Notes
+
+Two problems that look unrelated but are the same shape: model them as a bipartite graph, add a super-source and super-sink, and the maximum flow *is* the maximum matching. The pattern: `source → left nodes (cap 1) → right nodes (edge where allowed) → sink (cap 1 or a limit)`.
+
+## Mice_and_owls
+
+**Problem.** Mice are scattered on a plane; owls will strike. Each mouse can run at most a fixed distance and must reach a hole to survive. Each hole has a limited capacity (how many mice fit). Maximize the number of mice saved (equivalently, minimize the number eaten).
+
+### Idea
+Bipartite max flow with capacities on the right side:
+- **Source → each mouse**, capacity 1 (each mouse is one unit to route).
+- **Mouse → hole**, capacity 1, whenever the straight-line distance from the mouse to the hole is ≤ the mouse's travel distance (that's the geometry the `distance` / `canReach` helpers provide).
+- **Hole → sink**, capacity = the hole's capacity (a hole holding `k` mice becomes an edge of capacity `k`).
+
+Max flow from source to sink = the number of mice that can simultaneously be routed to holes without exceeding any hole's capacity = **mice saved**. **Mice eaten = total mice − max flow.**
+
+### Why it works
+Each unit of flow is one mouse traveling source → mouse → hole → sink. The unit capacity on `source → mouse` ensures each mouse is used once; the hole capacity on `hole → sink` enforces the hole limit; an integral max flow (guaranteed for integer capacities) gives an integral assignment. This is the classic reduction of *matching with capacities* to max flow.
+
+### Notes
+- **The distance test decides which edges exist.** Reachability is `distance(mouse, hole) <= maxDistance` — use `<=` (a mouse exactly at the limit still makes it). Compute distance as Euclidean; comparing squared distances avoids the `sqrt` if you want exact integer arithmetic, but doubles are fine here.
+- **Hole capacity lives on the hole → sink edge, not the mouse → hole edges.** Putting the limit on the sink edge is what caps how many mice a hole absorbs regardless of how many can reach it.
+- Any max-flow routine works; the network is small, so plain Ford-Fulkerson / Edmonds-Karp is plenty.
+
+## Elementary Math (variant — notes only)
+
+**Problem.** You're given `N` expressions, each a pair `(a, b)`. For each you must choose one operation — `a + b`, `a − b`, or `a × b` — so that all `N` chosen results are **distinct**. Decide whether it's possible (and, in the full problem, output the choices).
+
+### Idea
+This is **bipartite matching**, not a capacity problem:
+- **Left nodes = the `N` expressions.**
+- **Right nodes = the candidate result values** — each expression contributes at most 3 (`a+b`, `a−b`, `a×b`), so at most `3N` distinct values overall. Dedupe them and give each a node.
+- **Edge expression → value** for each of the (≤3) results that expression can produce.
+- **Source → each expression** (cap 1); **each value → sink** (cap 1, since each result value may be used by at most one expression).
+
+A **perfect matching** — max flow equal to `N` — means every expression can be assigned a *distinct* result. If max flow `< N`, it's impossible. To output the answer, read which value each expression is matched to and print the operation that produced it.
+
+### Why it's the same family as Mice and Owls
+Both are "assign each left item to a right slot, each slot used a limited number of times, respecting an allowed-pairs relation." Mice/holes has hole capacities > 1 on the sink edges; Elementary Math has capacity 1 everywhere (a pure matching). Same source→left→right→sink skeleton; the only differences are what the right nodes represent and what the sink-edge capacities are.
+
+### Notes
+- **Distinctness = unit capacity on the value → sink edge.** That single-use constraint is exactly "all results distinct."
+- **The value set is small** (≤ 3N), so building the right side by enumerating each expression's three results and deduplicating is cheap. Map each distinct value to an index.
+- **Watch `a − b` sign and `a × b` magnitude** when hashing values — negative and large products are valid distinct values; don't accidentally collapse them.
+- It's a feasibility (perfect-matching) question: you only care whether max flow reaches `N`; the matching edges give the operation choices for the constructive output.
+
+
+---
+
+## Edmonds_karp
+
+Ford-Fulkerson that always augments along the **shortest** augmenting path (fewest edges), found by BFS.
+
+### Idea
+The only change from generic Ford-Fulkerson is *how you pick the path*: use **BFS** on the residual graph, so each augmenting path has the minimum number of edges. That single choice bounds the work — the source-to-sink distance never decreases and increases at least once every `O(E)` augmentations, capping the total at `O(V·E)` augmentations.
+
+```
+res = copy of capacity
+while BFS finds a residual path source->sink (parent[]):
+    bottleneck = min residual on the path
+    subtract bottleneck along forward edges, add along reverse edges
+    flow += bottleneck
+```
+
+### Complexity
+O(V·E²), independent of capacity values — the fix that makes plain Ford-Fulkerson's O(E·maxflow) capacity-dependent bound go away. Guaranteed to terminate even with large capacities.
+
+### Notes
+- **BFS, not DFS, is the whole point.** DFS can pick long, silly paths and take a number of augmentations proportional to the flow value; BFS's shortest paths give the polynomial bound.
+- Everything else — residual graph, reverse edges, bottleneck — is identical to Ford-Fulkerson.
+
+---
+
+## Capacity_scaling
+
+Ford-Fulkerson that pushes **large amounts first**: only use augmenting paths whose every edge has residual capacity ≥ a threshold `delta`, shrinking `delta` by halves.
+
+### Idea
+Set `delta` to the largest power of two ≤ the maximum edge capacity. Repeatedly find augmenting paths that stay on edges with residual ≥ `delta` (a "wide" path) and saturate them; when none remain, **halve `delta`** and continue. By the time `delta` reaches 1 you're considering every edge, so the final flow is maximum.
+
+```
+delta = largest power of two <= max capacity
+while delta >= 1:
+    while a residual path source->sink using only edges with residual >= delta exists:
+        augment along it
+    delta /= 2
+```
+
+### Complexity
+O(E² · log U), where `U` is the maximum capacity. Each `delta`-phase adds O(E) augmentations, and there are `log U` phases (the halvings). Great when capacities are large but the graph is small.
+
+### Notes
+- **`delta` phases = the bit-length of the max capacity.** Starting high and halving means you route the bulk of the flow in a few big pushes before fussing over small residuals.
+- **The path search is restricted, not the graph.** You still search the full residual graph; you just refuse to traverse an edge whose residual is below `delta`. A DFS/BFS with that filter finds the wide paths.
+- Correct because when `delta = 1` the restriction disappears and it degenerates into ordinary Ford-Fulkerson, which is exact.
+- The largest power of two ≤ U is `Integer.highestOneBit(maxCapacity)` — handy for initializing `delta`.
+
+---
+
+## Dinics
+
+The fast general-purpose max-flow algorithm: alternate **BFS level graphs** with **DFS blocking flows**.
+
+### Idea
+Each phase has two steps:
+1. **BFS to build the level graph.** From the source, assign every vertex its BFS distance (`level`) in the residual graph. Keep only edges that go from level `L` to level `L+1` — this "level graph" has no shortcuts or back-edges. If the sink is unreachable, you're done.
+2. **DFS blocking flow.** Repeatedly push flow from source to sink along level-respecting edges (only `u→v` where `level[v] == level[u] + 1`) until no augmenting path remains *in the level graph*. Multiple paths are found per phase, not one.
+
+```
+while BFS assigns levels and sink is reachable:
+    while a blocking-flow DFS from source can push more:
+        push along level+1 edges, updating residuals
+```
+
+The crucial optimization inside the DFS is a **per-vertex "current edge" pointer** (`iter[]`): once an edge from `u` leads to a dead end this phase, skip it on future DFS attempts. Without this pruning the DFS is slow; with it, the blocking flow is efficient.
+
+### Complexity
+O(V²·E) in general. On **unit-capacity** graphs (including bipartite matching) it's O(E·√V) — which is why Dinic's is the go-to for matching problems. Each phase strictly increases the source-sink distance, so there are at most `V` phases.
+
+### Notes
+- **Two nested ideas:** BFS gives the level structure (like Edmonds-Karp's shortest paths), but instead of one augment per BFS, the DFS extracts an entire *blocking flow* (all the augmenting paths at that distance) before rebuilding levels. Fewer BFS rebuilds → faster.
+- **The `iter[]` / current-arc pruning is mandatory for the bound.** Re-scanning dead-end edges every DFS turns O(V²E) into something much worse. Advance the per-vertex edge pointer as edges get saturated or lead nowhere this phase.
+- **Only follow `level+1` edges in the DFS.** That restriction is what keeps the DFS acyclic and guarantees progress; wandering to same- or lower-level vertices reintroduces cycles.
+- **Reset `level[]` and `iter[]` each phase** — they describe the residual graph as it is at the start of that phase.
+- Same residual/reverse-edge machinery underneath; Dinic's just organizes the augmentations far more efficiently than picking one path at a time.
