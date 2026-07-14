@@ -1,5 +1,5 @@
 package Problems;
-import java.util.Objects;
+import java.util.*;
 
 // N-Queens (backtracking).
 // Place n queens on an n x n board so that no two attack each other: no shared
@@ -24,7 +24,45 @@ public class N_queens {
     // separately (the standard convention: n=8 -> 92).
     // Throw IllegalArgumentException if n < 1.
     public static long countSolutions(int n) {
-        throw new UnsupportedOperationException("not implemented yet");
+        if(n < 1){
+            throw new IllegalArgumentException();
+        }
+        if(n == 1){
+            return 1;
+        }if(n==2 || n==3){
+            return 0;
+        }
+        ArrayList<Integer> state = new ArrayList<Integer>();
+        int count = recursion_all_solution(state,0, n);
+        return count;
+    }
+
+    public static int recursion_all_solution(ArrayList<Integer> state, int queennum, int n){
+        if(queennum == n){
+            return 1;
+        }
+        else{
+            int counter = 0;
+            for(int i=0;i< n;i++){
+                if(!state.contains(i)){
+                    // row check and column check is done
+                    boolean can_place = true;
+                    for(int j=0; j<state.size(); j++){
+                        if((queennum-j) == (i-state.get(j))){
+                            can_place = false;
+                        }else if((queennum-j) == -1*(i-state.get(j))){
+                            can_place = false;
+                        }
+                    }
+                    if(can_place){
+                        state.add(i);
+                        counter += recursion_all_solution(state, queennum+1, n);
+                        state.remove(state.size() - 1);
+                    }
+                }
+            }
+            return counter;
+        }
     }
 
     // Return one valid placement as an array q of length n, where q[r] is the
@@ -33,17 +71,54 @@ public class N_queens {
     // Any valid placement is acceptable; tests validate the board, not one answer.
     // Throw IllegalArgumentException if n < 1.
     public static int[] oneSolution(int n) {
-        throw new UnsupportedOperationException("not implemented yet");
+        if(n < 1){
+            throw new IllegalArgumentException();
+        }
+        if(n == 1){
+            return new int[]{0};
+        }if(n==2 || n==3){
+            return new int[0];
+        }
+        ArrayList<Integer> state = new ArrayList<Integer>();
+        boolean test = recursion_one_solution(state,0, n);
+        if(test){
+            return state.stream().mapToInt(i -> i).toArray();
+        }
+        return new int[0];
     }
 
-    // --- suggested private helper (shape only; use, rename, or replace freely) ---
-
-    // Backtrack from row r; return the count below this state (for counting), or
-    // a boolean "found" (for oneSolution) — or unify both with a small flag.
-    private static long backtrack(int r, int n, boolean[] cols, boolean[] diag1,
-                                  boolean[] diag2, int[] placement, boolean stopAtFirst) {
-        throw new UnsupportedOperationException("not implemented yet");
+    public static boolean recursion_one_solution(ArrayList<Integer> state, int queennum, int n){
+        if(queennum == n){
+            return true;
+        }
+        else{
+            for(int i=0;i< n;i++){
+                if(!state.contains(i)){
+                    // row check and column check is done
+                    boolean can_place = true;
+                    for(int j=0; j<state.size(); j++){
+                        if((queennum-j) == (i-state.get(j))){
+                            can_place = false;
+                        }else if((queennum-j) == -1*(i-state.get(j))){
+                            can_place = false;
+                        }
+                    }
+                    if(can_place){
+                        state.add(i);
+                        boolean check  = recursion_one_solution(state, queennum+1, n);
+                        if(check){
+                            return true;
+                        }else{
+                            state.remove(state.size() - 1);
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
+
+
 }
 
 class N_queens_Main {
