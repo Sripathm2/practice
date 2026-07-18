@@ -7,7 +7,7 @@ A personal study laboratory — one repository for everything I'm working throug
 - **`Data_structures/`** — generic structures plus shared types (`Graph` interface, both graph representations, `Tree_node`), each in its own file with a `<Name>_Main` test runner.
 - **`Algorithms/`** — reusable algorithms that build on those structures: suffix-array string algorithms, merge sort, graph traversals, tree algorithms, shortest paths, topological sorts, SCC, MST, Eulerian paths, and four max-flow implementations. Same per-file test-runner pattern.
 - **`Problems/`** — specific named problems and exercises: the recursion/divide-and-conquer exercises, tilings, knapsacks, Kattis problems, Held-Karp TSP, grid shortest path, and the Mice-and-Owls bipartite-flow problem. The rule of thumb separating the two code packages: `Algorithms/` holds reusable procedures another file might import; `Problems/` holds leaf files that answer one specific question.
-- **`ml/`** — the machine-learning / math track (Python): topic folders holding book labs and my own experiments, plus the shared conda environment spec. Organized by **topic, not by book** — every book feeds the same tree (see `ml/` layout below).
+- **`Machine_learning/`** — the machine-learning / math track (Python): topic folders holding book labs and my own experiments, plus the shared conda environment spec. Organized by **topic, not by book** — every book feeds the same tree (see `Machine_learning/` layout below).
 - **`Data_structures_notes.md`, `Algorithms_notes.md`, `Problems_notes.md`, `ML_notes.md`** — prose notes, one file per area (see the topic index).
 - **Planned areas** (same pattern — a root folder + a root notes file each): `probability/` for Stat 110, `leetcode/` for NeetCode-150 / LeetCode practice.
 - **`Images/`** — figures referenced by the notes.
@@ -24,12 +24,12 @@ One notes file per package — a class's note is always in the file matching its
 | `Problems_notes.md` | Recursion/D&C exercises (multiplication, list sum, string reversal, max-2D, three-way min), DP problems (magical cows, tilings, mountain scenes, narrow art gallery, knapsacks), grid shortest path, Held-Karp TSP, and bipartite matching via max flow (Mice and Owls, Elementary Math) |
 | `ML_notes.md` | The ML/statistics track, built chapter by chapter from book highlights (currently: ISL). Concept notes in Definition / Intuition / Notes format, grouped by topic |
 
-## The `ml/` area (Python)
+## The `Machine_learning/` area (Python)
 
 The ML track lives beside the Java packages, in Python, organized by **topic — never per book** (books come and go; topics accumulate). Each topic folder holds book labs and my own experiments, distinguished by filename prefix:
 
 ```
-ml/
+Machine_learning/
   environment.yml           # the shared conda env spec (see Conda_setup_mac.md)
   data/                     # datasets (large files gitignored)
   linear-regression/        #   islp_lab_ch03.ipynb, exp_gradient_descent.py, ...
@@ -51,7 +51,7 @@ Notes for all of it go in the single `ML_notes.md` at the root — same one-note
 
 ## Conventions
 
-Every **Java** class follows the same rules so the codebase reads consistently (the `ml/` area follows the lighter Python conventions above instead):
+Every **Java** class follows the same rules so the codebase reads consistently (the `Machine_learning/` area follows the lighter Python conventions above instead):
 
 - **Generic backing** via `Object[]` with `@SuppressWarnings("unchecked")` casts on read (Java erasure rules out `new E[n]`). Numeric-only structures (e.g. `Fenwick_tree`) use a primitive backing like `long[]` instead.
 - **Contract-only comments** above each method — what it does, returns, and throws — with no implementation hints, so the method body is the exercise.
@@ -61,30 +61,33 @@ Every **Java** class follows the same rules so the codebase reads consistently (
 
 ## Build & run
 
-Requires a JDK for the Java packages (developed and tested on JDK 21; a fresh container needs `apt-get install -y default-jdk-headless`) and the `ml` conda environment for notebooks (see `Conda_setup_mac.md`). One root `Makefile` drives everything:
+Requires a JDK for the Java packages (developed and tested on JDK 21; a fresh container needs `apt-get install -y default-jdk-headless`) and the `ml` conda environment for notebooks. `make setup` checks the toolchain and builds the environment for you (install Miniforge first — see `Conda_setup_mac.md`). One root `Makefile` drives everything:
 
 ```sh
+make setup                    # verify javac/python3/conda (error if missing),
+                              #   then create or update the ml conda env and
+                              #   register its Jupyter kernel
 make run F=Stack              # compile all Java, run Data_structures.Stack_Main, clean
 make run F=Magical_cows       # package auto-detected (Problems here)
 make run-nb N=islp_lab_ch03   # execute a notebook top-to-bottom in place
-                              #   (bare name is found under ml/; a path works too)
+                              #   (bare name is found under Machine_learning/; a path works too)
 make run-latest               # run the most recently modified source anywhere:
                               #   .java -> its _Main, .ipynb -> execute it,
-                              #   ml/ .py -> run it in the ml env
+                              #   Machine_learning/ .py -> run it in the ml env
 make run-all                  # run every Java *_Main, log to test-results.log,
                               #   print only failures
 make list                     # list runnable classes and notebooks, newest first
 make clean                    # delete .class files, .ipynb_checkpoints, and
-                              #   generated artifacts under ml/ (pngs, exports,
-                              #   csv dumps outside ml/data/ — protected types:
-                              #   .ipynb .py .yml .yaml .md and all of ml/data/)
+                              #   generated artifacts under Machine_learning/ (pngs, exports,
+                              #   csv dumps outside Machine_learning/data/ — protected types:
+                              #   .ipynb .py .yml .yaml .md and all of Machine_learning/data/)
 make clean-all                # clean + strip output cells from every notebook
                               #   (run before committing notebooks)
 ```
 
 `make run` picks the Java package automatically based on which folder contains `<F>.java`, then auto-cleans the generated `.class` files. Interface/type files with no `_Main` are skipped by `run-all` automatically. Notebook execution and output-stripping use the `ml` conda env when conda is on the machine (`conda run -n ml`), falling back to whatever `jupyter` is on PATH.
 
-For interactive work in `ml/`: `conda activate ml`, then `jupyter lab` from the repo root. Setup instructions: `Conda_setup_mac.md`.
+For interactive work in `Machine_learning/`: `conda activate ml`, then `jupyter lab` from the repo root. Setup instructions: `Conda_setup_mac.md`.
 
 ## Notes format
 
@@ -111,7 +114,7 @@ The intent is that the learning happens while filling in the skeletons and chasi
 - **Abdul Bari — Algorithms** (YouTube) — https://www.youtube.com/playlist?list=PLAPEtbmG9XgTQqVYWAgAR6MilRB93OeMQ — *up next*
 
 ### ML / math track
-- **Introduction to Statistical Learning (ISL / ISLP)** — https://www.statlearning.com — *in progress; labs under `ml/`, notes in `ML_notes.md`*
+- **Introduction to Statistical Learning (ISL / ISLP)** — https://www.statlearning.com — *in progress; labs under `Machine_learning/`, notes in `ML_notes.md`*
 - **Harvard Stat 110 — Probability** (Joe Blitzstein) — https://stat110.hsites.harvard.edu/ · lectures: https://www.youtube.com/playlist?list=PL2SOU6wwxB0uwwH80KTQ6ht66KWxbzTIo · free book: https://probabilitybook.net
 - **Andrej Karpathy — Neural Networks: Zero to Hero** — https://karpathy.ai/zero-to-hero.html · playlist: https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ
 - **Aurélien Géron — Hands-On Machine Learning** (ch. 10–16; code repo) — https://github.com/ageron/handson-ml3
@@ -122,7 +125,7 @@ The intent is that the learning happens while filling in the skeletons and chasi
 
 *Environment: macOS, zsh. Links above were checked against their sources; the ML-track entries should be re-verified periodically as course pages move.*
 
-----
+---
 
 # Bug List — Working Checklist
 
