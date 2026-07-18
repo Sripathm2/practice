@@ -1,0 +1,16 @@
+name: ml
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - matplotlib
+  - scikit-learn
+  - statsmodels
+  - jupyterlab
+  - ipykernel
+  - seaborn
+  - pip
+  - pip:
+      - ISLP        # the ISL Python-edition package: datasets + lab helpers

@@ -1,13 +1,15 @@
-# DSA & Algorithms — From-Scratch Java
+# Study Lab
 
-A personal repository of data structures and algorithms implemented from scratch in Java, for interview and research-engineering preparation. Every structure is written by hand (no `java.util` collections backing them), documented in prose notes, and validated by a self-contained test runner. The work is paced and deliberate: the goal is durable understanding, not just passing tests.
+A personal study laboratory — one repository for everything I'm working through, across languages and formats. It currently holds a from-scratch **data structures & algorithms track in Java** (interview and research-engineering preparation) and a **machine-learning / statistics track in Python** (book labs and experiments); planned areas include **probability** (Harvard Stat 110), **LeetCode / NeetCode 150 practice**, and further ML coursework — all under the same roof, same conventions, same notes discipline. Everything is written by hand, documented in prose notes, and validated (Java: self-contained test runners; Python: executable notebooks). The work is paced and deliberate: the goal is durable understanding, not just passing tests.
 
 ## Repo map
 
 - **`Data_structures/`** — generic structures plus shared types (`Graph` interface, both graph representations, `Tree_node`), each in its own file with a `<Name>_Main` test runner.
 - **`Algorithms/`** — reusable algorithms that build on those structures: suffix-array string algorithms, merge sort, graph traversals, tree algorithms, shortest paths, topological sorts, SCC, MST, Eulerian paths, and four max-flow implementations. Same per-file test-runner pattern.
 - **`Problems/`** — specific named problems and exercises: the recursion/divide-and-conquer exercises, tilings, knapsacks, Kattis problems, Held-Karp TSP, grid shortest path, and the Mice-and-Owls bipartite-flow problem. The rule of thumb separating the two code packages: `Algorithms/` holds reusable procedures another file might import; `Problems/` holds leaf files that answer one specific question.
-- **`Data_structures_notes.md`, `Algorithms_notes.md`, `Problems_notes.md`** — prose notes, one file per package (see the topic index).
+- **`ml/`** — the machine-learning / math track (Python): topic folders holding book labs and my own experiments, plus the shared conda environment spec. Organized by **topic, not by book** — every book feeds the same tree (see `ml/` layout below).
+- **`Data_structures_notes.md`, `Algorithms_notes.md`, `Problems_notes.md`, `ML_notes.md`** — prose notes, one file per area (see the topic index).
+- **Planned areas** (same pattern — a root folder + a root notes file each): `probability/` for Stat 110, `leetcode/` for NeetCode-150 / LeetCode practice.
 - **`Images/`** — figures referenced by the notes.
 - **`Makefile`** — root build/run harness for all three packages.
 
@@ -20,10 +22,36 @@ One notes file per package — a class's note is always in the file matching its
 | `Data_structures_notes.md` | Arrays, linked lists, stack/queue, heap & priority queues, union-find, BST & AVL, hash tables, Fenwick tree, suffix array, indexed PQ, sparse table, and both graph representations (adjacency matrix & list) |
 | `Algorithms_notes.md` | Suffix-array string algorithms (unique substrings, LRS, LCS), divide & conquer + merge sort, graphs overview, DFS/BFS, tree algorithms (rooting, leaf sum, center, isomorphism, LCA), topological sorts, DAG paths, Dijkstra, Bellman-Ford, Floyd-Warshall, Tarjan SCC, Eulerian path, Prim, and the four max-flow algorithms |
 | `Problems_notes.md` | Recursion/D&C exercises (multiplication, list sum, string reversal, max-2D, three-way min), DP problems (magical cows, tilings, mountain scenes, narrow art gallery, knapsacks), grid shortest path, Held-Karp TSP, and bipartite matching via max flow (Mice and Owls, Elementary Math) |
+| `ML_notes.md` | The ML/statistics track, built chapter by chapter from book highlights (currently: ISL). Concept notes in Definition / Intuition / Notes format, grouped by topic |
+
+## The `ml/` area (Python)
+
+The ML track lives beside the Java packages, in Python, organized by **topic — never per book** (books come and go; topics accumulate). Each topic folder holds book labs and my own experiments, distinguished by filename prefix:
+
+```
+ml/
+  environment.yml           # the shared conda env spec (see Conda_setup_mac.md)
+  data/                     # datasets (large files gitignored)
+  linear-regression/        #   islp_lab_ch03.ipynb, exp_gradient_descent.py, ...
+  classification/           # logistic regression, LDA/QDA, naive Bayes, KNN
+  resampling/               # cross-validation, bootstrap
+  regularization/           # ridge, lasso, PCR/PLS, model selection
+  nonlinear/                # polynomials, splines, GAMs
+  trees/                    # decision trees, bagging, random forests, boosting
+  svm/
+  deep-learning/            # ISL ch10 labs now; Karpathy/Géron material later
+  survival/                 # censored data, survival curves
+  unsupervised/             # PCA, clustering
+  inference/                # multiple testing; Stat 110 probability work later
+```
+
+Naming convention inside a topic folder: `<source>_<what>.ipynb|py` — e.g. `islp_lab_ch08.ipynb` (a book lab, kept close to the book's version), `exp_tree_depth_sweep.py` (my own experiment). One conda environment (`ml`) serves the whole tree; per-topic environments only if a book genuinely conflicts (deep-learning may eventually get its own for torch pinning).
+
+Notes for all of it go in the single `ML_notes.md` at the root — same one-notes-file-per-area rule as the Java packages — built chapter by chapter via the handoff workflow in `ML_handoff.md`.
 
 ## Conventions
 
-Every class follows the same rules so the codebase reads consistently:
+Every **Java** class follows the same rules so the codebase reads consistently (the `ml/` area follows the lighter Python conventions above instead):
 
 - **Generic backing** via `Object[]` with `@SuppressWarnings("unchecked")` casts on read (Java erasure rules out `new E[n]`). Numeric-only structures (e.g. `Fenwick_tree`) use a primitive backing like `long[]` instead.
 - **Contract-only comments** above each method — what it does, returns, and throws — with no implementation hints, so the method body is the exercise.
@@ -33,22 +61,34 @@ Every class follows the same rules so the codebase reads consistently:
 
 ## Build & run
 
-Requires a JDK (developed and tested on JDK 21; a fresh container needs `apt-get install -y default-jdk-headless`). From the repo root:
+Requires a JDK for the Java packages (developed and tested on JDK 21; a fresh container needs `apt-get install -y default-jdk-headless`) and the `ml` conda environment for notebooks (see `Conda_setup_mac.md`). One root `Makefile` drives everything:
 
 ```sh
-make run F=Stack              # compile everything, run Data_structures.Stack_Main, then clean
+make run F=Stack              # compile all Java, run Data_structures.Stack_Main, clean
 make run F=Magical_cows       # package auto-detected (Problems here)
-make run-latest               # run the most recently modified file's _Main
-make run-all                  # run every *_Main, log to test-results.log, print only failures
-make list                     # list runnable classes, newest first
-make clean                    # delete all .class files
+make run-nb N=islp_lab_ch03   # execute a notebook top-to-bottom in place
+                              #   (bare name is found under ml/; a path works too)
+make run-latest               # run the most recently modified source anywhere:
+                              #   .java -> its _Main, .ipynb -> execute it,
+                              #   ml/ .py -> run it in the ml env
+make run-all                  # run every Java *_Main, log to test-results.log,
+                              #   print only failures
+make list                     # list runnable classes and notebooks, newest first
+make clean                    # delete .class files, .ipynb_checkpoints, and
+                              #   generated artifacts under ml/ (pngs, exports,
+                              #   csv dumps outside ml/data/ — protected types:
+                              #   .ipynb .py .yml .yaml .md and all of ml/data/)
+make clean-all                # clean + strip output cells from every notebook
+                              #   (run before committing notebooks)
 ```
 
-`make run` picks the package automatically based on which folder contains `<F>.java`, then auto-cleans the generated `.class` files. Interface/type files with no `_Main` are skipped by `run-all` automatically.
+`make run` picks the Java package automatically based on which folder contains `<F>.java`, then auto-cleans the generated `.class` files. Interface/type files with no `_Main` are skipped by `run-all` automatically. Notebook execution and output-stripping use the `ml` conda env when conda is on the machine (`conda run -n ml`), falling back to whatever `jupyter` is on PATH.
+
+For interactive work in `ml/`: `conda activate ml`, then `jupyter lab` from the repo root. Setup instructions: `Conda_setup_mac.md`.
 
 ## Notes format
 
-Data-structure notes use a three-part template — **Positives / Negatives / Algorithm (thought process)** — and algorithm/problem notes use **Idea / Complexity / Notes**. Notes live in three root-level files mirroring the three packages, each with a grouped table of contents. Complexity claims describe *this repo's implementations*; faster textbook variants are noted as upgrades. Where an implementation has a known deviation or bug, the note carries a **Code flag** line pointing at the reconciliation report.
+Data-structure notes use a three-part template — **Positives / Negatives / Algorithm (thought process)** — and algorithm/problem notes use **Idea / Complexity / Notes**. ML concept notes use **Definition / Intuition / Notes** (terms get a crisp definition, a plain-language why-it-matters, then caveats and connections). Notes live in root-level files mirroring the areas, each with a grouped table of contents. Complexity claims describe *this repo's implementations*; faster textbook variants are noted as upgrades. Where an implementation has a known deviation or bug, the note carries a **Code flag** line pointing at the reconciliation report.
 
 ## How Claude is used in this project
 
@@ -70,19 +110,17 @@ The intent is that the learning happens while filling in the skeletons and chasi
 - **William Fiset — Algorithms** (companion Java repo) — https://github.com/williamfiset/Algorithms
 - **Abdul Bari — Algorithms** (YouTube) — https://www.youtube.com/playlist?list=PLAPEtbmG9XgTQqVYWAgAR6MilRB93OeMQ — *up next*
 
-<!-- ### ML / math track
-- **Introduction to Statistical Learning (ISL)** — https://www.statlearning.com
+### ML / math track
+- **Introduction to Statistical Learning (ISL / ISLP)** — https://www.statlearning.com — *in progress; labs under `ml/`, notes in `ML_notes.md`*
 - **Harvard Stat 110 — Probability** (Joe Blitzstein) — https://stat110.hsites.harvard.edu/ · lectures: https://www.youtube.com/playlist?list=PL2SOU6wwxB0uwwH80KTQ6ht66KWxbzTIo · free book: https://probabilitybook.net
 - **Andrej Karpathy — Neural Networks: Zero to Hero** — https://karpathy.ai/zero-to-hero.html · playlist: https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ
 - **Aurélien Géron — Hands-On Machine Learning** (ch. 10–16; code repo) — https://github.com/ageron/handson-ml3
 - **Chip Huyen — Designing Machine Learning Systems** — https://huyenchip.com/books/ · **Stanford CS329S** — https://stanford-cs329s.github.io/
-- **Khang Pham — Machine Learning Interviews** (late-stage drilling) — https://mlengineer.io/ -->
+- **Khang Pham — Machine Learning Interviews** (late-stage drilling) — https://mlengineer.io/
 
 ---
 
 *Environment: macOS, zsh. Links above were checked against their sources; the ML-track entries should be re-verified periodically as course pages move.*
-
-
 
 ----
 
