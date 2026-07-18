@@ -74,8 +74,10 @@ make run-nb N=islp_lab_ch03   # execute a notebook top-to-bottom in place
 make run-latest               # run the most recently modified source anywhere:
                               #   .java -> its _Main, .ipynb -> execute it,
                               #   Machine_learning/ .py -> run it in the ml env
-make run-all                  # run every Java *_Main, log to test-results.log,
-                              #   print only failures
+make run-all                  # run every Java *_Main AND execute every notebook
+                              #   under Machine_learning/, log to test-results.log,
+                              #   print only failures (notebooks skipped with a
+                              #   notice if conda/jupyter isn't installed)
 make list                     # list runnable classes and notebooks, newest first
 make clean                    # delete .class files, .ipynb_checkpoints, and
                               #   generated artifacts under Machine_learning/ (pngs, exports,
@@ -124,6 +126,10 @@ The intent is that the learning happens while filling in the skeletons and chasi
 ---
 
 *Environment: macOS, zsh. Links above were checked against their sources; the ML-track entries should be re-verified periodically as course pages move.*
+
+## License
+
+BSD 2-Clause — see `LICENSE`. Chosen to match the license of the ISLP package this repo's ML labs build on, so my code and the upstream lab code sit under compatible terms. Note that any ISLP lab files copied into `Machine_learning/` remain © their original authors under their own BSD-2-Clause notice — keep upstream headers intact on copied files; this repo's license covers my own code and notes.
 
 ---
 
